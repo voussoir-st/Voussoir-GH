@@ -111,13 +111,13 @@ namespace Components
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddCurveParameter("Input Quad", "BasePoyline", "Closed Polilyne with 4 vertices.", GH_ParamAccess.item);
+            pManager.AddCurveParameter("Input Quad", "BasePoyline", "Closed Polilyne with 4 vertices.", GH_ParamAccess.list);
             pManager.AddNumberParameter("Vault Height", "VaultHeight", "Arc's Height.", GH_ParamAccess.item, 2.0);
-            pManager.AddBooleanParameter("Span Direction", "SpanDirection", "0 = arcs on sides 0-1 and 2-3; 1 = arcs on sides 1-2 and 3-0.", GH_ParamAccess.item, true);
+            //pManager.AddBooleanParameter("Span Direction", "SpanDirection", "0 = arcs on sides 0-1 and 2-3; 1 = arcs on sides 1-2 and 3-0.", GH_ParamAccess.item, true);
             pManager.AddIntegerParameter("Arc Selection", "VaultProfile",
                 "Right-click to select type of curve\n\nParabola = 0\nArc = 1\nCatenary = 2\n\n... or input one of the above integers", GH_ParamAccess.item, 2);
 
-            var param = (Param_Integer)pManager[3];
+            var param = (Param_Integer)pManager[2];
             param.AddNamedValue("Parabola", 0);
             param.AddNamedValue("Arc", 1);
             param.AddNamedValue("Catenary", 2);
@@ -136,55 +136,30 @@ namespace Components
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             // Declare input variables
-            Curve quadCrv = null;
+            List<Curve> springerLines = new List<Curve>();
             double height = 2.0;
-            bool spanDir = true;
+            bool spanDir = false;
             int mode = 0;
 
             // Retrieve input data from Grasshopper
-            if (!DA.GetData(0, ref quadCrv)) 
-            { 
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Falta o quadrilátero."); 
-                return; 
+            if (!DA.GetDataList(0, springerLines))
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "At least 2 Curves needed.");
+                return;
             }
             DA.GetData(1, ref height);
-            DA.GetData(2, ref spanDir);
-            DA.GetData(3, ref mode);
+            //DA.GetData(2, ref spanDir);
+            DA.GetData(2, ref mode);
 
-            // Try to get a Polyline from the input curve for concavity check
-            Polyline poly;
-            if (!quadCrv.TryGetPolyline(out poly))
-            {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Input curve must be a polyline for concavity check.");
-                return;
-            }
-            if (Components.PolylineUtils.IsConcave(poly))
-            {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Input polyline cannot be concave.");
-                return;
-            }
-
-            // Validate that the input curve is closed
-            if (quadCrv == null || !quadCrv.IsClosed)
-            {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "The curve must be closed.");
-                return;
-            }
-
-            // Try to extract the four corners of the quadrilateral
-            if (!VoussoirPlugin02.Components.Utils.TryGetQuadCorners(quadCrv, out var p0, out var p1, out var p2, out var p3))
-            {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Não foi possível obter 4 cantos do quadrilátero.");
-                return;
-            }
+            Components.Utils.OrientArcs(springerLines);
 
             // Define the four edges of the quadrilateral
             var edges = new (Point3d A, Point3d B)[]
             {
-                (p0, p1), // 0
-                (p1, p2), // 1
-                (p2, p3), // 2
-                (p3, p0)  // 3
+                (springerLines[0].PointAtStart, springerLines[1].PointAtStart), // 0
+                (springerLines[1].PointAtStart, springerLines[1].PointAtEnd), // 1
+                (springerLines[1].PointAtEnd, springerLines[0].PointAtEnd), // 2
+                (springerLines[0].PointAtEnd, springerLines[0].PointAtStart), // 3
             };
 
             // Define which edges will be used for arcs and which for lines, based on span direction
@@ -226,7 +201,7 @@ namespace Components
             }
 
             // Orient the arcs using the utility function (may flip direction for consistency)
-            VoussoirPlugin02.Components.Utils.OrientArcs(arcs);
+            Components.Utils.OrientArcs(arcs);
 
             // Create the lofted surface between the two arcs
             var loftBreps = Brep.CreateFromLoft(arcs, Point3d.Unset, Point3d.Unset, LoftType.Normal, false);

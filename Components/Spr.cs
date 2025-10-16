@@ -143,13 +143,13 @@ namespace VoussoirPlugin03
                     // Extrude the line along the vertical vector
                     Surface extrusion = Surface.CreateExtrusion(line, vertical);
                     Brep extrusionBrep = Brep.CreateFromSurface(extrusion);
-
-                    GH_Structure<GH_Brep> intersectedVoussoirs = new GH_Structure<GH_Brep>();
-
+                    
                     for (int branchIdx = 0; branchIdx < remappedVoussoirs.Branches.Count; branchIdx++)
                     {
                         var branch = remappedVoussoirs.Branches[branchIdx];
                         GH_Path branchPath = remappedVoussoirs.Paths[branchIdx];
+
+                        GH_Structure<GH_Brep> intersectedVoussoirs = new GH_Structure<GH_Brep>();
 
                         foreach (var vouss in branch)
                         {

@@ -79,7 +79,7 @@ namespace Components
             if (!arc1.IsValid || !arc2.IsValid || spanDiv < 2 | lengthDiv < 2) return;
 
             // Use Utils.OrientArcs if needed
-            VoussoirPlugin02.Components.Utils.OrientArcs(new List<Curve> { arc1, arc2 });
+            Components.Utils.OrientArcs(new List<Curve> { arc1, arc2 });
             arc1 = boundaryCurves[1];
             arc2 = boundaryCurves[3];
 
