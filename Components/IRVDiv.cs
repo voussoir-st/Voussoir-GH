@@ -37,7 +37,7 @@ namespace Components
         }
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddCurveParameter("Vault Arcs", "VaultArcs", "List of two arcs defining the vault edges", GH_ParamAccess.list);
+            pManager.AddSurfaceParameter("Vault Surface", "VaultSurface", "Surface that defines the vault", GH_ParamAccess.item);
             pManager.AddIntegerParameter("Transversal Divisions", "TransversalDivisions", "Number of voussoirs in the vault's span", GH_ParamAccess.item, 12);
             pManager.AddIntegerParameter("Longitudinal divisions", "LongitudinalDivisions", "Number of voussoirs in the vault's length", GH_ParamAccess.item, 8);
         }
@@ -46,35 +46,42 @@ namespace Components
         {
             pManager.AddPlaneParameter("Intrados Planes", "IP", "Intrados planar vault panels", GH_ParamAccess.list);
             pManager.AddPlaneParameter("Division planes", "DP", "Planes of each Voussoir Contact Surface", GH_ParamAccess.tree);
-            pManager.AddPlaneParameter("Longitudinal planes", "LP", "Planes at each length division", GH_ParamAccess.list);
             pManager.AddPlaneParameter("Transversal planes", "TP", "Planes at each span division", GH_ParamAccess.list);
+            pManager.AddPlaneParameter("Longitudinal planes", "LP", "Planes at each length division", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
-            List<Curve> vaultArcs = new List<Curve>();
+            Surface vaultSrf = null;
             int spanDiv = 12;
             int lengthDiv = 8;
 
-            if (!DA.GetDataList(0, vaultArcs)) return;
-            if (vaultArcs.Count != 2) return;
-            if (!DA.GetData(1, ref spanDiv)) return;
-            if (!DA.GetData(2, ref lengthDiv)) return;
-
-            Curve arc1 = vaultArcs[0];
-            Curve arc2 = vaultArcs[1];
-            if (!arc1.IsValid || !arc2.IsValid || spanDiv < 2 || lengthDiv < 2) return;
-
-            // Use Utils.OrientArcs
-            VoussoirPlugin02.Components.Utils.OrientArcs(vaultArcs);
-            arc1 = vaultArcs[0];
-            arc2 = vaultArcs[1];
+            if (!DA.GetData(0, ref vaultSrf)) return;
+            if (!DA.GetData(2, ref spanDiv)) return;
+            if (!DA.GetData(1, ref lengthDiv)) return;
 
             // 1. Create Lofted Surface
-            var loftBreps = Brep.CreateFromLoft(new List<Curve> { arc1, arc2 }, Point3d.Unset, Point3d.Unset, LoftType.Normal, false);
-            if (loftBreps == null || loftBreps.Length == 0)
+            Brep loftBrep = vaultSrf.ToBrep();
+            if (loftBrep == null || loftBrep.Edges.Count < 2)
                 return;
-            Surface loftSrf = Components.PolylineUtils.AlignNormalToWorldZ(loftBreps[0].Surfaces[0]);
+            Surface loftSrf = Components.PolylineUtils.AlignNormalToWorldZ(loftBrep.Surfaces[0]);
+
+            // 2. Extract boundary curves (arcs) from the surface
+            Curve[] boundaryCurvesArray = loftBrep.DuplicateEdgeCurves(true);
+            List<Curve> boundaryCurves = boundaryCurvesArray.ToList();
+            if (boundaryCurves.Count < 2)
+                return;
+
+            // Assume the first and last boundary curves in the V direction are the vault arcs
+            Curve arc1 = boundaryCurves[1];
+            Curve arc2 = boundaryCurves[3]; // This may need adjustment depending on surface orientation
+
+            if (!arc1.IsValid || !arc2.IsValid || spanDiv < 2 | lengthDiv < 2) return;
+
+            // Use Utils.OrientArcs if needed
+            VoussoirPlugin02.Components.Utils.OrientArcs(new List<Curve> { arc1, arc2 });
+            arc1 = boundaryCurves[1];
+            arc2 = boundaryCurves[3];
 
             // Otherwise, keep DivideByCount for count-based division
             List<Point3d> arc1_pts = new List<Point3d>();
@@ -276,8 +283,8 @@ namespace Components
 
             DA.SetDataTree(0, panelPlanesTree);
             DA.SetDataTree(1, divisionPlanesTree);
-            DA.SetDataList(2, longitudinalPlanes);
-            DA.SetDataList(3, transversalPlanes);
+            DA.SetDataList(3, longitudinalPlanes);
+            DA.SetDataList(2, transversalPlanes);
         }
 
     }

@@ -128,9 +128,9 @@ namespace Components
 
         protected override void RegisterOutputParams(GH_OutputParamManager p)
         {
+            p.AddSurfaceParameter("Vault Surface", "VS", "The lofted base surface between the two arcs.", GH_ParamAccess.item);
             p.AddCurveParameter("Vault Arcs", "VA", "The 2 generated arcs.", GH_ParamAccess.list);
             p.AddCurveParameter("Lines", "L", "The 2 Horizontal lines (remaining sides).", GH_ParamAccess.list);
-            p.AddSurfaceParameter("Vault Surface", "VS", "The lofted base surface between the two arcs.", GH_ParamAccess.item);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -235,16 +235,16 @@ namespace Components
                 // Align the normal of the first lofted surface to World Z
                 var alignedSurface = Components.PolylineUtils.AlignNormalToWorldZ(loftBreps[0].Surfaces[0]);
                 Surface loftSurface = alignedSurface;
-                DA.SetData(2, loftSurface); // Output index 2 for the surface
+                DA.SetData(0, loftSurface); // Output index 2 for the surface
             }
             else
             {
-                DA.SetData(2, null);
+                DA.SetData(0, null);
             }
 
             // Output the arcs and lines to Grasshopper
-            DA.SetDataList(0, arcs); // VA: only arcs
-            DA.SetDataList(1, lines); // L: only lines
+            DA.SetDataList(1, arcs); // VA: only arcs
+            DA.SetDataList(2, lines); // L: only lines
         }
 
         private Curve BuildSpanCurve(Point3d start, Point3d end, double h, int mode)

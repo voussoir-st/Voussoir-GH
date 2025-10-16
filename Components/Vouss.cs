@@ -54,8 +54,8 @@ namespace Components
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
             pManager.AddBrepParameter("Voussoir", "V", "Voussoir Blocks", GH_ParamAccess.tree);
-            pManager.AddSurfaceParameter("Intrados", "I", "Intrados Surfaces", GH_ParamAccess.tree);
             pManager.AddSurfaceParameter("Extrados", "E", "Extrados Surfaces", GH_ParamAccess.tree);
+            pManager.AddSurfaceParameter("Intrados", "I", "Intrados Surfaces", GH_ParamAccess.tree);
             pManager.AddBrepParameter("Contact Faces", "CF", "Voussoir contact faces", GH_ParamAccess.tree);
             //pManager.AddCurveParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
         }
@@ -269,10 +269,10 @@ namespace Components
                     if (pts != null && pts.Count == 4)
                     {
                         // Ensure the points are in the correct order for surface creation
-                        Point3d pt0 = pts[0];
-                        Point3d pt1 = pts[1];
-                        Point3d pt2 = pts[3];
-                        Point3d pt3 = pts[2];
+                        Point3d pt0 = pts[2];
+                        Point3d pt1 = pts[3];
+                        Point3d pt2 = pts[1];
+                        Point3d pt3 = pts[0];
 
                         // Create a 4-point surface
                         Surface srf = NurbsSurface.CreateFromCorners(pt0, pt1, pt2, pt3);
@@ -307,6 +307,17 @@ namespace Components
                 for (int i = 0; i < extradosBrep.Edges.Count; i++)
                     edgesB.Add(extradosBrep.Edges[i].DuplicateCurve());
 
+                // Reverse the list
+                edgesB.Reverse();
+
+                // Shift the list by one index forward (first element moves to the end)
+                if (edgesB.Count > 1)
+                {
+                    Curve first = edgesB[0];
+                    edgesB.RemoveAt(0);
+                    edgesB.Add(first);
+                }
+
                 // Supondo que ambas têm o mesmo número de edges
                 int edgeCount = Math.Min(edgesA.Count, edgesB.Count);
 
@@ -314,6 +325,7 @@ namespace Components
                 {
                     Curve c1 = edgesA[i];
                     Curve c2 = edgesB[i];
+                    c2.Reverse();
 
                     Brep[] loft = Brep.CreateFromLoft(
                         new List<Curve> { c1, c2 },
@@ -373,8 +385,8 @@ namespace Components
             //log.Add("bye");
 
             DA.SetDataTree(0, voussoirs);
-            DA.SetDataTree(1, intradosFaces);
-            DA.SetDataTree(2, extradosFaces);
+            DA.SetDataTree(2, intradosFaces);
+            DA.SetDataTree(1, extradosFaces);
             DA.SetDataTree(3, contactFaces);
             //DA.SetDataTree(4, intersectionCurve);
         }
