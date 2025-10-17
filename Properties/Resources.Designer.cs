@@ -73,6 +73,16 @@ namespace VoussoirPlugin03.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap catenary {
+            get {
+                object obj = ResourceManager.GetObject("catenary", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap cube09 {
             get {
                 object obj = ResourceManager.GetObject("cube09", resourceCulture);

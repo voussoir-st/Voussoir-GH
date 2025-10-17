@@ -144,14 +144,29 @@ namespace Components
             // Retrieve input data from Grasshopper
             if (!DA.GetDataList(0, springerLines))
             {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "At least 2 Curves needed.");
-                return;
+                if (springerLines.Count < 2)
+                {
+                    AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "At least 2 Curves needed.");
+                    return;
+                }
             }
             DA.GetData(1, ref height);
             //DA.GetData(2, ref spanDir);
             DA.GetData(2, ref mode);
 
             Components.Utils.OrientArcs(springerLines);
+            bool intersectLines = false;
+            if (springerLines.Count >= 2)
+            {
+                var events = Rhino.Geometry.Intersect.Intersection.CurveCurve(springerLines[0], springerLines[1], RhinoDoc.ActiveDoc.ModelAbsoluteTolerance, 0.0);
+                intersectLines = events != null && events.Count > 0;
+
+                if (intersectLines)
+                {
+                    AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Springer Lines cannot intersect.");
+                    return;
+                }
+            }
 
             // Define the four edges of the quadrilateral
             var edges = new (Point3d A, Point3d B)[]
