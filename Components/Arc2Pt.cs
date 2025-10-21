@@ -1,12 +1,6 @@
-﻿using Ed.Eto;
-using Grasshopper.Kernel;
+﻿using Grasshopper.Kernel;
 using Rhino.Geometry;
-using Rhino.Render.ChangeQueue;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace VoussoirPlugin03.Components
 {

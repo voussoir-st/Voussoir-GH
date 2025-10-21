@@ -83,9 +83,9 @@ namespace VoussoirPlugin03.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        internal static System.Drawing.Bitmap Catenary2Pt {
+        internal static System.Drawing.Bitmap CatH {
             get {
-                object obj = ResourceManager.GetObject("Catenary2Pt", resourceCulture);
+                object obj = ResourceManager.GetObject("CatH", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

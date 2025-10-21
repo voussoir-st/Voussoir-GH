@@ -18,7 +18,7 @@ namespace Components
         {
             get
             {
-                return VoussoirPlugin03.Properties.Resources.Catenary2Pt;
+                return VoussoirPlugin03.Properties.Resources.CatH;
             }
         }
         public override Guid ComponentGuid => new Guid("A1B2C3D4-E5F6-47A8-9B0C-123456789ABC");
@@ -38,7 +38,7 @@ namespace Components
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
-            
+
 
             Point3d start = Point3d.Unset;
             Point3d end = Point3d.Unset;
@@ -103,7 +103,7 @@ namespace Components
                 //log.Add("hello"+i);
                 double x = (span * 0.5) / a;
                 double cosh = Math.Cosh(x);
-                double sinh = Math.Sinh(x); 
+                double sinh = Math.Sinh(x);
                 double f = a * cosh - a - rise;
                 double df = cosh - 1.0 - (span * 0.5) * sinh / a;
                 //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "debug 00 path:" + i);
@@ -117,7 +117,7 @@ namespace Components
             }
             //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "debug 04 a:" + a);
             return a;
-            
+
         }
     }
 }

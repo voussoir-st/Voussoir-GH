@@ -1,7 +1,6 @@
 using Grasshopper.Kernel;
 using Rhino.Geometry;
 using System;
-using System.Collections.Generic;
 using VoussoirPlugin03.Properties;
 
 namespace VoussoirPlugin03.Components
@@ -52,7 +51,7 @@ namespace VoussoirPlugin03.Components
             DA.SetData(0, parabola);
         }
 
-        private Curve BuildParabola(Point3d start, Point3d end, double rise)
+        private static Curve BuildParabola(Point3d start, Point3d end, double rise)
         {
             // Midpoint between start and end, elevated by rise in Z
             Point3d mid = 0.5 * (start + end) + Vector3d.ZAxis * rise;
