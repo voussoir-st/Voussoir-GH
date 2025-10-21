@@ -13,8 +13,8 @@ namespace VoussoirPlugin03.Components
     public class CatenaryFromPoints : GH_Component
     {
         public CatenaryFromPoints()
-          : base("Arc from 2 points", "Arc2Pt",
-            "Creates an arc curve between two points with a specified height.\nThe height is limited to half the distance from A to B." ,
+          : base("Arc by Height", "ArcH",
+            "Create an upward arc between two points and a given height (max radius constrained by point distance)",
             "Voussoir", "Wootils")
         {
         }
@@ -30,14 +30,14 @@ namespace VoussoirPlugin03.Components
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddPointParameter("Start", "A", "Start point of the catenary.", GH_ParamAccess.item);
-            pManager.AddPointParameter("End", "B", "End point of the catenary.", GH_ParamAccess.item);
-            pManager.AddNumberParameter("Height", "H", "Rise (height) of the catenary.", GH_ParamAccess.item, 2.0);
+            pManager.AddPointParameter("Start", "A", "Start point of the arc.", GH_ParamAccess.item);
+            pManager.AddPointParameter("End", "B", "End point of the arc.", GH_ParamAccess.item);
+            pManager.AddNumberParameter("Height", "H", "Height of the arc.", GH_ParamAccess.item, 2.0);
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddCurveParameter("Arc", "A", "Catenary curve.", GH_ParamAccess.item);
+            pManager.AddCurveParameter("Arc", "C", "Arc curve.", GH_ParamAccess.item);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)

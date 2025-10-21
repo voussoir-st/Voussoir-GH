@@ -9,8 +9,8 @@ namespace VoussoirPlugin03.Components
     public class ParabolaFromPoints : GH_Component
     {
         public ParabolaFromPoints()
-          : base("Parabola From Points", "Parabola2Pt",
-            "Creates a parabola curve between two points with a specified height.",
+          : base("Parabola by Height", "ParH",
+            "Create an upward catenary between two points and a given height.",
             "Voussoir", "Wootils")
         {
         }
@@ -30,12 +30,12 @@ namespace VoussoirPlugin03.Components
         {
             pManager.AddPointParameter("Start", "A", "Start point of the parabola.", GH_ParamAccess.item);
             pManager.AddPointParameter("End", "B", "End point of the parabola.", GH_ParamAccess.item);
-            pManager.AddNumberParameter("Height", "H", "Rise (height) of the parabola.", GH_ParamAccess.item, 2.0);
+            pManager.AddNumberParameter("Height", "H", "Height of the parabola.", GH_ParamAccess.item, 2.0);
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddCurveParameter("Parabola", "P", "Parabola curve.", GH_ParamAccess.item);
+            pManager.AddCurveParameter("Parabola", "C", "Parabola curve.", GH_ParamAccess.item);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)

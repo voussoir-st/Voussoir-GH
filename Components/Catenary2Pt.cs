@@ -8,8 +8,8 @@ namespace Components
     public class CatenaryFromPoints : GH_Component
     {
         public CatenaryFromPoints()
-          : base("Catenary From Points", "Catenary2Pt",
-            "Creates a catenary curve between two points with a specified height.",
+          : base("Catenary by Height", "CatH",
+            "Create an upward parabola between two points and a given height.",
             "Voussoir", "Wootils")
         {
         }
@@ -33,7 +33,7 @@ namespace Components
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
             pManager.AddCurveParameter("Catenary", "C", "Catenary curve.", GH_ParamAccess.item);
-            pManager.AddCurveParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
+            //pManager.AddCurveParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -103,7 +103,7 @@ namespace Components
                 //log.Add("hello"+i);
                 double x = (span * 0.5) / a;
                 double cosh = Math.Cosh(x);
-                double sinh = Math.Sinh(x);
+                double sinh = Math.Sinh(x); 
                 double f = a * cosh - a - rise;
                 double df = cosh - 1.0 - (span * 0.5) * sinh / a;
                 //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "debug 00 path:" + i);
