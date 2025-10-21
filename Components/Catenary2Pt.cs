@@ -10,7 +10,7 @@ namespace Components
         public CatenaryFromPoints()
           : base("Catenary From Points", "Catenary2Pt",
             "Creates a catenary curve between two points with a specified height.",
-            "Voussoir", "Utils")
+            "Voussoir", "Wootils")
         {
         }
 
@@ -18,7 +18,7 @@ namespace Components
         {
             get
             {
-                return VoussoirPlugin03.Properties.Resources.catenary;
+                return VoussoirPlugin03.Properties.Resources.Catenary2Pt;
             }
         }
         public override Guid ComponentGuid => new Guid("A1B2C3D4-E5F6-47A8-9B0C-123456789ABC");

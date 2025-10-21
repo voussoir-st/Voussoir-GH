@@ -19,11 +19,11 @@ namespace Components
     {
         public VoussoirCreate()
          : base(
-               "Block Voussoir",
+               "Create Voussoirs",
                "BVouss",
                "Creates Voussoirs based on predefined planes.",
                "Voussoir",
-               "3.Voissoirs"
+               "Vault Creation"
                )
         { }
 
@@ -55,8 +55,11 @@ namespace Components
         {
             pManager.AddBrepParameter("Voussoir", "V", "Voussoir Blocks", GH_ParamAccess.tree);
             pManager.AddSurfaceParameter("Extrados", "E", "Extrados Surfaces", GH_ParamAccess.tree);
+            pManager.HideParameter(1);
             pManager.AddSurfaceParameter("Intrados", "I", "Intrados Surfaces", GH_ParamAccess.tree);
+            pManager.HideParameter(2);
             pManager.AddBrepParameter("Contact Faces", "CF", "Voussoir contact faces", GH_ParamAccess.tree);
+            pManager.HideParameter(3);
             //pManager.AddCurveParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
         }
 

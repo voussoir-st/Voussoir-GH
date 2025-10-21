@@ -63,9 +63,9 @@ namespace VoussoirPlugin03.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        internal static System.Drawing.Bitmap BVDC {
+        internal static System.Drawing.Bitmap Arc2Pt {
             get {
-                object obj = ResourceManager.GetObject("BVDC", resourceCulture);
+                object obj = ResourceManager.GetObject("Arc2Pt", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -73,9 +73,19 @@ namespace VoussoirPlugin03.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        internal static System.Drawing.Bitmap catenary {
+        internal static System.Drawing.Bitmap BVSrf {
             get {
-                object obj = ResourceManager.GetObject("catenary", resourceCulture);
+                object obj = ResourceManager.GetObject("BVSrf", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Catenary2Pt {
+            get {
+                object obj = ResourceManager.GetObject("Catenary2Pt", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -86,6 +96,16 @@ namespace VoussoirPlugin03.Properties {
         internal static System.Drawing.Bitmap cube09 {
             get {
                 object obj = ResourceManager.GetObject("cube09", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Parabola2Pt {
+            get {
+                object obj = ResourceManager.GetObject("Parabola2Pt", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

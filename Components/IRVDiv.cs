@@ -18,11 +18,11 @@ namespace Components
     {
         public IrregularVaultDivisionComponent()
           : base(
-                "Irregular Vault Division",
-                "IVDiv",
+                "Barrel Vault Division - Grid",
+                "BVDivG",
                 "Divides a vault defined by two arcs into spanwise and lengthwise voussoirs.",
                 "Voussoir",
-                "2.Division"
+                "Vault Creation"
                 )
         { }
 
@@ -46,8 +46,11 @@ namespace Components
         {
             pManager.AddPlaneParameter("Intrados Planes", "IP", "Intrados planar vault panels", GH_ParamAccess.list);
             pManager.AddPlaneParameter("Division planes", "DP", "Planes of each Voussoir Contact Surface", GH_ParamAccess.tree);
+            pManager.HideParameter(1);
             pManager.AddPlaneParameter("Transversal planes", "TP", "Planes at each span division", GH_ParamAccess.list);
+            pManager.HideParameter(2);
             pManager.AddPlaneParameter("Longitudinal planes", "LP", "Planes at each length division", GH_ParamAccess.list);
+            pManager.HideParameter(3);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -57,8 +60,8 @@ namespace Components
             int lengthDiv = 8;
 
             if (!DA.GetData(0, ref vaultSrf)) return;
-            if (!DA.GetData(2, ref spanDiv)) return;
-            if (!DA.GetData(1, ref lengthDiv)) return;
+            if (!DA.GetData(1, ref spanDiv)) return;
+            if (!DA.GetData(2, ref lengthDiv)) return;
 
             // 1. Create Lofted Surface
             Brep loftBrep = vaultSrf.ToBrep();
@@ -76,7 +79,7 @@ namespace Components
             Curve arc1 = boundaryCurves[1];
             Curve arc2 = boundaryCurves[3]; // This may need adjustment depending on surface orientation
 
-            if (!arc1.IsValid || !arc2.IsValid || spanDiv < 2 | lengthDiv < 2) return;
+            if (!arc1.IsValid || !arc2.IsValid || spanDiv < 2 | lengthDiv < 0) return;
 
             // Use Utils.OrientArcs if needed
             Components.Utils.OrientArcs(new List<Curve> { arc1, arc2 });

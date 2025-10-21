@@ -27,11 +27,11 @@ namespace VoussoirPlugin03
         {
             public VoussoirCreate()
              : base(
-                   "VoussoirSpringer",
+                   "Springer",
                    "Spr",
                    "Creates a Springer based on the voussoirs closest to the springer line",
                    "Voussoir",
-                   "4.Springers"
+                   "Vault Creation"
                    )
             { }
 
@@ -169,10 +169,8 @@ namespace VoussoirPlugin03
                                 // Store the original voussoir in its respective branch
                                 intersectedVoussoirs.Append(vouss, branchPath);
                             }
-                        }
+                        } 
                     }
-
-
                 }
                 //DA.SetDataList(0, walls);
                 //DA.SetDataTree(1, intersectedVoussoirs);               

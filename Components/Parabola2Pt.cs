@@ -2,6 +2,7 @@ using Grasshopper.Kernel;
 using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
+using VoussoirPlugin03.Properties;
 
 namespace VoussoirPlugin03.Components
 {
@@ -10,11 +11,20 @@ namespace VoussoirPlugin03.Components
         public ParabolaFromPoints()
           : base("Parabola From Points", "Parabola2Pt",
             "Creates a parabola curve between two points with a specified height.",
-            "Voussoir", "Utils")
+            "Voussoir", "Wootils")
         {
         }
 
         public override Guid ComponentGuid => new Guid("B2C3D4E5-F6A7-48B9-9C0D-23456789ABCD");
+
+        protected override System.Drawing.Bitmap Icon
+        {
+            get
+            {
+                // Use the imported Resources class directly
+                return Resources.Parabola2Pt;
+            }
+        }
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {

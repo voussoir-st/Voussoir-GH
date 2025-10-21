@@ -89,9 +89,13 @@ namespace Components
         /// new tabs/panels will automatically be created.
         /// </summary>
         public BarrelVaultDefiningCurves()
-          : base("Barrel Vault Defining Curves", "BVDefCrvs",
-            "Creates the defining curves for the creation of a barrel vault",
-            "Voussoir", "1.Vault Type")
+          : base(
+            "Barrel Vault Base Surface", 
+            "BVSrf",
+            "Creates the base surface for the creation of a barrel vault",
+            "Voussoir",
+            "Vault Creation"
+          )
         {
         }
 
@@ -105,13 +109,13 @@ namespace Components
             get
             {
                 // Use the imported Resources class directly
-                return Resources.BVDC;
+                return Resources.BVSrf;
             }
         }
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddCurveParameter("Input Quad", "BasePoyline", "Closed Polilyne with 4 vertices.", GH_ParamAccess.list);
+            pManager.AddCurveParameter("Input Lines", "SpringerLines", "2 non intersecting lines", GH_ParamAccess.list);
             pManager.AddNumberParameter("Vault Height", "VaultHeight", "Arc's Height.", GH_ParamAccess.item, 2.0);
             //pManager.AddBooleanParameter("Span Direction", "SpanDirection", "0 = arcs on sides 0-1 and 2-3; 1 = arcs on sides 1-2 and 3-0.", GH_ParamAccess.item, true);
             pManager.AddIntegerParameter("Arc Selection", "VaultProfile",
@@ -126,11 +130,13 @@ namespace Components
             pManager[2].Optional = true; // Span Direction
         }
 
-        protected override void RegisterOutputParams(GH_OutputParamManager p)
+        protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            p.AddSurfaceParameter("Vault Surface", "VS", "The lofted base surface between the two arcs.", GH_ParamAccess.item);
-            p.AddCurveParameter("Vault Arcs", "VA", "The 2 generated arcs.", GH_ParamAccess.list);
-            p.AddCurveParameter("Lines", "L", "The 2 Horizontal lines (remaining sides).", GH_ParamAccess.list);
+            pManager.AddSurfaceParameter("Vault Surface", "VS", "The lofted base surface between the two arcs.", GH_ParamAccess.item);
+            pManager.AddCurveParameter("Vault Arcs", "VA", "The 2 generated arcs.", GH_ParamAccess.list);
+            pManager.HideParameter(1);
+            pManager.AddCurveParameter("Lines", "L", "The 2 Horizontal lines (remaining sides).", GH_ParamAccess.list);
+            pManager.HideParameter(2);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
