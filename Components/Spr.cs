@@ -1,39 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using Grasshopper.Kernel;
+﻿using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino;
 using Rhino.Geometry;
+using Rhino.Render;
+using System;
+using System.Collections.Generic;
 
 
 namespace VoussoirPlugin03
 {
     namespace Components
     {
-        public static class Utilsb
-        {
-            public static void OrientArcs(List<Curve> arcs)
-            {
-                if (arcs == null || arcs.Count != 2)
-                    return;
-
-                Point3d arc0Start = arcs[0].PointAtStart;
-                Point3d arc0End = arcs[0].PointAtEnd;
-                Point3d arc1Start = arcs[1].PointAtStart;
-                Point3d arc1End = arcs[1].PointAtEnd;
-
-                double dStart = arc0Start.DistanceTo(arc1Start);
-                double dEnd = arc0End.DistanceTo(arc1End);
-                double dCrossStartEnd = arc0Start.DistanceTo(arc1End);
-                double dCrossEndStart = arc0End.DistanceTo(arc1Start);
-
-                if (dStart + dEnd > dCrossStartEnd + dCrossEndStart)
-                {
-                    arcs[1].Reverse();
-                }
-            }
-        }
         public class VoussoirCreate : GH_Component
         {
             public VoussoirCreate()
@@ -66,7 +44,7 @@ namespace VoussoirPlugin03
 
             protected override void RegisterOutputParams(GH_OutputParamManager pManager)
             {
-                pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.list);
+                pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
                 pManager.AddLineParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
                 pManager.AddBrepParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.list);
             }
@@ -141,14 +119,41 @@ namespace VoussoirPlugin03
                         extrados.Append(new GH_Brep(extradosBrep), new GH_Path(0));
                     }
                 }
+                
+                int vertexCount = 0;
+                double sumx = 0;
+                double sumy = 0;
+                double sumz = 0;
+                
+                foreach (GH_Brep ghBrep in remappedVoussoirs.AllData(true))
+                {
+                    Brep brep = ghBrep.Value;
+                    if (brep == null) continue;
+                    Point3d v = brep.Vertices[1].Location;                 
+                    vertexCount += 1;
+                    sumx += v.X;
+                    sumy += v.Y;
+                    sumz += v.Z;
+                }
+                double x = sumx / vertexCount;
+                //System.Diagnostics.Debug.WriteLine($"x: {x}");
+                double y = sumy / vertexCount;
+                //System.Diagnostics.Debug.WriteLine($"y: {y}");
+                double z = sumz / vertexCount;
+                //System.Diagnostics.Debug.WriteLine($"z: {z}");
+                Point3d sum = new Point3d(x, y, z);                
 
                 //=========================================
                 // Create Springers
                 //=========================================
-                List<Brep> springers = new List<Brep>();
+                List<Brep> springers = new List<Brep>();                            
+                              
+                List<Brep> spBlocks = new List<Brep>();
 
+                int spLineCounter = 0;
                 foreach (Curve line in spLine)
                 {
+                    //System.Diagnostics.Debug.WriteLine($"Curve line in spLine");
                     // Create a vertical vector (Z direction) of length 10
                     Vector3d vertical = new Vector3d(0, 0, 10);
 
@@ -156,18 +161,23 @@ namespace VoussoirPlugin03
                     Surface extrusion = Surface.CreateExtrusion(line, vertical);
                     Brep extrusionBrep = Brep.CreateFromSurface(extrusion);
 
+                    GH_Structure<GH_Line> secondZline = new GH_Structure<GH_Line>();
+
                     //=========================================
                     // Voussoir interactions
                     //=========================================
-                    GH_Structure<GH_Line> secondZline = new GH_Structure<GH_Line>();
 
+                    //System.Diagnostics.Debug.WriteLine($""+ spLineCounter+"Just before the forloop. remappedVoussoirs.Branches.Count: " + remappedVoussoirs.Branches.Count);
+                    //for (int branchIdx = 0; branchIdx < 3; branchIdx++)
                     for (int branchIdx = 0; branchIdx < remappedVoussoirs.Branches.Count; branchIdx++)
                     {
+                            
+                        System.Diagnostics.Debug.WriteLine($"remappedVoussoirs.Branches.Count " + remappedVoussoirs.Branches.Count);
                         var branch = remappedVoussoirs.Branches[branchIdx];
                         GH_Path branchPath = remappedVoussoirs.Paths[branchIdx];
-
                         GH_Structure<GH_Brep> intersectedVoussoirs = new GH_Structure<GH_Brep>();
 
+                        int voussoirIndex = 0;
                         foreach (var vouss in branch)
                         {
                             Brep voussBrep = vouss.Value;
@@ -183,28 +193,58 @@ namespace VoussoirPlugin03
                             if (intersects && ((intersectionCurves != null && intersectionCurves.Length > 0) ||
                                                (intersectionPoints != null && intersectionPoints.Length > 0)))
                             {
+                                //System.Diagnostics.Debug.WriteLine($"" + spLineCounter + " voussBrep: " + voussoirIndex);
+                                //System.Diagnostics.Debug.WriteLine($""+spLineCounter+"INTERSECT got true. branchPath: "+ branchPath);
+
                                 // Store the original voussoir in its respective branch
                                 intersectedVoussoirs.Append(vouss, branchPath);
+
+                                ////VIEW CONTENTS OF intersectedVoussoirs
+                                //for (int i = 0; i < intersectedVoussoirs.Branches.Count; i++)
+                                //{
+                                //    GH_Path path = intersectedVoussoirs.Paths[i];
+                                //    List<GH_Brep> branch2 = intersectedVoussoirs.Branches[i];
+
+                                //    //System.Diagnostics.Debug.WriteLine($"Branch {i} at path {path}: {branch2.Count} items");
+
+                                //    foreach (var ghBrep in branch2)
+                                //    {
+                                //        Brep brep = ghBrep?.Value;
+                                //        if (brep == null) continue;
+
+                                //        //System.Diagnostics.Debug.WriteLine($"  Brep: {brep.GetHashCode()} — Vertices: {brep.Vertices.Count}");
+                                //    }
+                                //}
                             }
+                            voussoirIndex++;
                         }
+                        int count2 = 0;
+                        //System.Diagnostics.Debug.WriteLine($"" + spLineCounter + "intersectedVoussoirs.Branches.Count: " + intersectedVoussoirs.Branches.Count);
 
                         for (int i = 0; i < intersectedVoussoirs.Branches.Count; i++)
                         {
+                            System.Diagnostics.Debug.WriteLine($"intersectedVoussoirs.Branches.Count " + intersectedVoussoirs.Branches.Count);
                             var b = intersectedVoussoirs.Branches[i];
                             GH_Path path = intersectedVoussoirs.Paths[i];
 
                             // Lista temporária para armazenar todos os valores Z deste ramo
                             List<double> zValues = new List<double>();
-
+                            int a = 0;
                             foreach (var ghBrep in b)
                             {
-                                Brep brep = ghBrep.Value;
+                                //System.Diagnostics.Debug.WriteLine($"brep: {a}");
 
+                                Brep brep = ghBrep.Value;
+                                int q = 0;
                                 // Iterar pelos vértices de cada Brep
                                 foreach (BrepVertex v in brep.Vertices)
                                 {
+                                    
                                     zValues.Add(v.Location.Z);
+                                    //System.Diagnostics.Debug.WriteLine($"vertex z: {q}");
+                                    q++;
                                 }
+                                a++;
                             }
 
                             // Ordenar os valores de Z do maior para o menor
@@ -212,15 +252,28 @@ namespace VoussoirPlugin03
                             zValues.Reverse();
                             Line zLine = new Line(spLine[0].PointAtStart, spLine[0].PointAtStart + Vector3d.ZAxis * zValues[1]);
                             secondZline.Append(new GH_Line(zLine), path);
+                            //System.Diagnostics.Debug.WriteLine($"secondZline {count2}");
+                            count2++;
+                            //System.Diagnostics.Debug.WriteLine($"zValues:" + zValues);
                         }
                     }
+
                     Vector3d vert = line.PointAtStart + Vector3d.ZAxis * 1 - line.PointAtStart;
                     Line sLine = new Line(line.PointAtStart, line.PointAtEnd);
                     Rhino.Geometry.Plane spPlane = new Rhino.Geometry.Plane(line.PointAtStart, sLine.Direction, vert);
-                    Vector3d offsetVec = spPlane.YAxis * spWidth;
-                    Line offsetLine = new Line(line.PointAtStart + offsetVec, line.PointAtEnd + offsetVec);
+                    double d = spPlane.DistanceTo(sum);
+                    //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "debug 01 d: " + d);
+                    
+                    if (d > 0)
+                    {
+                        spPlane.Flip();
+                        //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "debug 02 d: " + d);
+                    }
+                    Vector3d offsetVec = spPlane.ZAxis * spWidth;
+                    Line offsetLine = new Line(sLine.PointAt(0) + offsetVec, sLine.PointAt(1) + offsetVec);
                     offsetLine.Extend(20, 20);
                     List<Line> springerLines = new List<Line>();
+
                     foreach (GH_Plane ghPlane in tPlanes)
                     {
                         Rhino.Geometry.Plane p = ghPlane.Value;
@@ -253,15 +306,13 @@ namespace VoussoirPlugin03
                     //=========================================
                     Line bl = new Line(line.PointAtStart, line.PointAtEnd);
 
-
-                    List<Brep[]> spBlocks = new List<Brep[]>();
                     for (int i = 0; i < springerLines.Count - 1; i++)
                     {
                         Curve springerLine = springerLines[i].ToNurbsCurve();
                         Curve springerLinesNext = springerLines[i + 1].ToNurbsCurve();
 
                         Brep springerSurface = Brep.CreateFromLoft(new List<Curve> { springerLine, springerLinesNext }, Point3d.Unset, Point3d.Unset, LoftType.Normal, false)[0];
-                        spBlocks.Add(new Brep[] { springerSurface });
+                        spBlocks.Add(springerSurface);
                         List<Curve> spSurfaceEdges = new List<Curve>();
                         Curve spSurfaceEdge0 = springerSurface.Edges[0];
                         spSurfaceEdges.Add(spSurfaceEdge0);
@@ -273,23 +324,33 @@ namespace VoussoirPlugin03
                         spSurfaceEdges.Add(spSurfaceEdge3);
                         Curve.JoinCurves(spSurfaceEdges, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
 
-                        // double z = secondZValues.Branches[i][0].Value;
-                        // Curve verticalEdge = new Line(
-                        //     springerLine.PointAtStart,
-                        //     springerLine.PointAtStart + Vector3d.ZAxis * z
-                        // ).ToNurbsCurve();
+                        Line l = secondZline.Branches[i][0].Value;
+                        double a = l.Length;
+                        Curve verticalEdge = new Line(
+                            springerLine.PointAtStart,
+                            springerLine.PointAtStart + Vector3d.ZAxis * a
+                        ).ToNurbsCurve();
 
-                        // Brep[] springerBreps = Brep.CreateFromSweep(springerLine, spSurfaceEdges, true, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
-                        // Brep spb = springerBreps[0];
-
-                        // spBlocks.Add(springerBreps);
+                        Brep[] springerBreps = Brep.CreateFromSweep(springerLine, spSurfaceEdges, true, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+                        if (springerBreps != null && springerBreps.Length > 0)
+                        {
+                            Brep spb = springerBreps[0];
+                            spBlocks.AddRange(springerBreps);
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine($"⚠️ Sweep failed at index {i}");
+                        }
                     }
+                    
+                    spLineCounter++;
                     DA.SetDataTree(1, secondZline);
-                    DA.SetDataList(2, spBlocks);
-
                 }
                 //DA.SetDataList(0, walls);
-                //DA.SetDataTree(1, intersectedVoussoirs);               
+                //DA.SetDataTree(1, intersectedVoussoirs);
+                //DA.SetDataTree(0, intersectedVoussoirs);
+                //DA.SetDataTree(1, secondZline);
+                DA.SetDataList(2, spBlocks);
             }
         }
     }
