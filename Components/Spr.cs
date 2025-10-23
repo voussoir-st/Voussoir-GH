@@ -1,26 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Grasshopper.Kernel;
+using Grasshopper.Kernel.Data;
+using Grasshopper.Kernel.Types;
+using Rhino;
+using Rhino.Geometry;
+
 
 namespace VoussoirPlugin03
 {
-    using Components; // Ensure this is present to access Vault
-    using Grasshopper;
-    using Grasshopper.Kernel;
-    using Grasshopper.Kernel.Data;
-    using Grasshopper.Kernel.Geometry.Voronoi;
-    using Grasshopper.Kernel.Parameters;
-    using Grasshopper.Kernel.Types;
-    using Rhino;
-    using Rhino.Geometry;
-    using Rhino.Geometry.Intersect;
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using VoussoirPlugin03.Properties;
-
     namespace Components
     {
         public static class Utilsb
@@ -73,14 +61,14 @@ namespace VoussoirPlugin03
                 pManager.AddCurveParameter("Springer Line", "SpringerLine", "List of base lines to create vault springers", GH_ParamAccess.list);
                 pManager.AddBrepParameter("Voussoirs", "Voussoirs", "Voussoirs to analyse", GH_ParamAccess.tree);
                 pManager.AddPlaneParameter("Transversal Planes", "TransversalPlanes", "Planes at each span division", GH_ParamAccess.list);
-                pManager.AddNumberParameter("Springer Width", "SpringerWidth", "Distance perpendicular to springer line", GH_ParamAccess.item, 0.3);                              
+                pManager.AddNumberParameter("Springer Width", "SpringerWidth", "Distance perpendicular to springer line", GH_ParamAccess.item, 0.3);
             }
 
             protected override void RegisterOutputParams(GH_OutputParamManager pManager)
             {
                 pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.list);
-                pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
-                pManager.AddVectorParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.list);
+                pManager.AddLineParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
+                pManager.AddBrepParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.list);
             }
 
             protected override void SolveInstance(IGH_DataAccess DA)
@@ -90,7 +78,7 @@ namespace VoussoirPlugin03
                 //=========================================
                 List<Curve> spLine = new List<Curve>();
                 GH_Structure<GH_Brep> voussoirs = new GH_Structure<GH_Brep>();
-                List<Plane> tPlanes = new List<Plane>();
+                List<GH_Plane> tPlanes = new List<GH_Plane>();
                 double spWidth = 0.3;
 
                 //=========================================
@@ -101,44 +89,6 @@ namespace VoussoirPlugin03
                 if (!DA.GetDataList(2, tPlanes)) return;
                 if (!DA.GetData(3, ref spWidth)) return;
 
-                //=========================================
-                // springer line intersection points
-                //=========================================
-                List<Point3d> splPtsA = new List<Point3d>();
-                List<Point3d> splPtsB = new List<Point3d>();
-                Utilsb.OrientArcs(spLine);
-                List<Vector3d> sprVector = new List<Vector3d>();
-
-                foreach (Plane pl in tPlanes)
-                {
-                    double t; // parameter along the line where intersection occurs
-                    Line line = new Line(spLine[0].PointAtStart, spLine[0].PointAtEnd);
-                    
-                        if (Rhino.Geometry.Intersect.Intersection.LinePlane(line, pl, out t))
-                        {
-                            // Compute the 3D point at parameter t
-                            Point3d pt = line.PointAt(t);
-                            splPtsA.Add(pt);
-                        }
-
-                    double p; // parameter along the line where intersection occurs
-                    Line lineB = new Line(spLine[1].PointAtStart, spLine[1].PointAtEnd);
-
-                    if (Rhino.Geometry.Intersect.Intersection.LinePlane(lineB, pl, out p))
-                    {
-                        // Compute the 3D point at parameter t
-                        Point3d pt = lineB.PointAt(p);
-                        splPtsB.Add(pt);
-                    }
-                }
-                for (int i = 0; i < splPtsA.Count; i++)
-                {
-                    Line spl = new Line(splPtsA[i], splPtsB[i]);
-                    Vector3d splV = spl.PointAt(1) - spl.PointAt(0);
-                    splV.Unitize();
-                    sprVector.Add(splV);
-                }
-                DA.SetDataList(2, sprVector);
                 //=========================================
                 // Remap voussoirs tree: {A;B} → {B}(A) (Path Mapper style)
                 //=========================================
@@ -205,7 +155,12 @@ namespace VoussoirPlugin03
                     // Extrude the line along the vertical vector
                     Surface extrusion = Surface.CreateExtrusion(line, vertical);
                     Brep extrusionBrep = Brep.CreateFromSurface(extrusion);
-                    
+
+                    //=========================================
+                    // Voussoir interactions
+                    //=========================================
+                    GH_Structure<GH_Line> secondZline = new GH_Structure<GH_Line>();
+
                     for (int branchIdx = 0; branchIdx < remappedVoussoirs.Branches.Count; branchIdx++)
                     {
                         var branch = remappedVoussoirs.Branches[branchIdx];
@@ -233,8 +188,6 @@ namespace VoussoirPlugin03
                             }
                         }
 
-                        GH_Structure<GH_Number> secondZValues = new GH_Structure<GH_Number>();
-
                         for (int i = 0; i < intersectedVoussoirs.Branches.Count; i++)
                         {
                             var b = intersectedVoussoirs.Branches[i];
@@ -257,26 +210,83 @@ namespace VoussoirPlugin03
                             // Ordenar os valores de Z do maior para o menor
                             zValues.Sort();
                             zValues.Reverse();
+                            Line zLine = new Line(spLine[0].PointAtStart, spLine[0].PointAtStart + Vector3d.ZAxis * zValues[1]);
+                            secondZline.Append(new GH_Line(zLine), path);
+                        }
+                    }
+                    Vector3d vert = line.PointAtStart + Vector3d.ZAxis * 1 - line.PointAtStart;
+                    Line sLine = new Line(line.PointAtStart, line.PointAtEnd);
+                    Rhino.Geometry.Plane spPlane = new Rhino.Geometry.Plane(line.PointAtStart, sLine.Direction, vert);
+                    Vector3d offsetVec = spPlane.YAxis * spWidth;
+                    Line offsetLine = new Line(line.PointAtStart + offsetVec, line.PointAtEnd + offsetVec);
+                    offsetLine.Extend(20, 20);
+                    List<Line> springerLines = new List<Line>();
+                    foreach (GH_Plane ghPlane in tPlanes)
+                    {
+                        Rhino.Geometry.Plane p = ghPlane.Value;
 
-                            // Se existirem pelo menos dois valores, guarda o de índice 1
-                            if (zValues.Count > 1)
-                            {
-                                secondZValues.Append(new GH_Number(zValues[1]), path);
-                            }
-                            else if (zValues.Count == 1)
-                            {
-                                // Caso especial: só há um valor, guarda esse
-                                secondZValues.Append(new GH_Number(zValues[0]), path);
-                            }
-                            else
-                            {
-                                // Caso o ramo esteja vazio, podes guardar null ou ignorar
-                                secondZValues.Append(null, path);
-                            }
+                        Point3d ptA = Point3d.Unset;
+                        Point3d ptB = Point3d.Unset;
+                        bool hasA = false, hasB = false;
+
+                        if (Rhino.Geometry.Intersect.Intersection.LinePlane(sLine, p, out double t))
+                        {
+                            ptA = sLine.PointAt(t);
+                            hasA = true;
                         }
 
-                        //DA.SetDataTree(2, secondZValues);
+                        if (Rhino.Geometry.Intersect.Intersection.LinePlane(offsetLine, p, out double a))
+                        {
+                            ptB = offsetLine.PointAt(a);
+                            hasB = true;
+                        }
+
+                        if (hasA && hasB)
+                        {
+                            Line aLine = new Line(ptA, ptB);
+                            springerLines.Add(aLine);
+                        }
                     }
+
+                    //=========================================
+                    // springer's base shape
+                    //=========================================
+                    Line bl = new Line(line.PointAtStart, line.PointAtEnd);
+
+
+                    List<Brep[]> spBlocks = new List<Brep[]>();
+                    for (int i = 0; i < springerLines.Count - 1; i++)
+                    {
+                        Curve springerLine = springerLines[i].ToNurbsCurve();
+                        Curve springerLinesNext = springerLines[i + 1].ToNurbsCurve();
+
+                        Brep springerSurface = Brep.CreateFromLoft(new List<Curve> { springerLine, springerLinesNext }, Point3d.Unset, Point3d.Unset, LoftType.Normal, false)[0];
+                        spBlocks.Add(new Brep[] { springerSurface });
+                        List<Curve> spSurfaceEdges = new List<Curve>();
+                        Curve spSurfaceEdge0 = springerSurface.Edges[0];
+                        spSurfaceEdges.Add(spSurfaceEdge0);
+                        Curve spSurfaceEdge1 = springerSurface.Edges[1];
+                        spSurfaceEdges.Add(spSurfaceEdge1);
+                        Curve spSurfaceEdge2 = springerSurface.Edges[2];
+                        spSurfaceEdges.Add(spSurfaceEdge2);
+                        Curve spSurfaceEdge3 = springerSurface.Edges[3];
+                        spSurfaceEdges.Add(spSurfaceEdge3);
+                        Curve.JoinCurves(spSurfaceEdges, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+
+                        // double z = secondZValues.Branches[i][0].Value;
+                        // Curve verticalEdge = new Line(
+                        //     springerLine.PointAtStart,
+                        //     springerLine.PointAtStart + Vector3d.ZAxis * z
+                        // ).ToNurbsCurve();
+
+                        // Brep[] springerBreps = Brep.CreateFromSweep(springerLine, spSurfaceEdges, true, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+                        // Brep spb = springerBreps[0];
+
+                        // spBlocks.Add(springerBreps);
+                    }
+                    DA.SetDataTree(1, secondZline);
+                    DA.SetDataList(2, spBlocks);
+
                 }
                 //DA.SetDataList(0, walls);
                 //DA.SetDataTree(1, intersectedVoussoirs);               
