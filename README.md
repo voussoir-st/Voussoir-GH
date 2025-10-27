@@ -8,7 +8,7 @@ Voussoir is a Grasshopper plugin for Rhino that generates stereotomic vault geom
 
 ### Package Manager
 
-1. Go to Rhino's Package Manager and search for "Voussoir"
+1. Go to Rhino's Package Manager and search for `Voussoir`
 
 2. Click install and restart Rhino.
 
