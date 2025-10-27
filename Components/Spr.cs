@@ -133,10 +133,7 @@ namespace VoussoirPlugin03.Components
             
 
             foreach (var line in spLines)
-            {
-                var springerSurfacesLocal = new GH_Structure<GH_Brep>();
-                var springerLines = new List<Line>();
-
+            {                              
                 // Extrude line to create vertical reference
                 var extrusionBrep = Brep.CreateFromSurface(Surface.CreateExtrusion(line, Vector3d.ZAxis * 10));
 
@@ -157,16 +154,6 @@ namespace VoussoirPlugin03.Components
                     }
                 }
 
-                // Compute Z lines
-                var secondZlineLocal = new GH_Structure<GH_Line>();
-                foreach (var branchIdx in Enumerable.Range(0, intersectedVoussoirs.Branches.Count))
-                {
-                    var branch = intersectedVoussoirs.Branches[branchIdx];
-                    var zVals = branch.SelectMany(b => b.Value.Vertices.Select(v => v.Location.Z)).OrderByDescending(z => z).ToList();
-                    if (zVals.Count >= 2)
-                        secondZlineLocal.Append(new GH_Line(new Line(line.PointAtStart, line.PointAtStart + Vector3d.ZAxis * zVals[1])), new GH_Path(branchIdx));
-                }
-
                 // Compute base surfaces (springerSurfaces)
                 var spPlane = new Plane(line.PointAtStart, line.PointAtEnd - line.PointAtStart, Vector3d.ZAxis);
                 if (spPlane.DistanceTo(centroid) > 0) spPlane.Flip();
@@ -175,6 +162,8 @@ namespace VoussoirPlugin03.Components
 
                 var offsetLine = new Line(line.PointAtStart + spPlane.ZAxis * spWidth, line.PointAtEnd + spPlane.ZAxis * spWidth);
                 offsetLine.Extend(20, 20);
+
+                var springerLines = new List<Line>();
 
                 foreach (var p in tPlanes)
                 {
@@ -187,11 +176,23 @@ namespace VoussoirPlugin03.Components
                     }
                 }
 
+                var springerSurfacesLocal = new GH_Structure<GH_Brep>();
+
                 for (int i = 0; i < springerLines.Count - 1; i++)
                 {
                     var lofts = Brep.CreateFromLoft(new List<Curve> { springerLines[i].ToNurbsCurve(), springerLines[i + 1].ToNurbsCurve() }, Point3d.Unset, Point3d.Unset, LoftType.Normal, false);
                     if (lofts != null && lofts.Length > 0) springerSurfacesLocal.Append(new GH_Brep(lofts[0]), new GH_Path(i));
                 }
+
+                // Compute Z lines
+                var secondZlineLocal = new GH_Structure<GH_Line>();
+                foreach (var branchIdx in Enumerable.Range(0, intersectedVoussoirs.Branches.Count))
+                {
+                    var branch = intersectedVoussoirs.Branches[branchIdx];
+                    var zVals = branch.SelectMany(b => b.Value.Vertices.Select(v => v.Location.Z)).OrderByDescending(z => z).ToList();
+                    if (zVals.Count >= 2)
+                        secondZlineLocal.Append(new GH_Line(new Line(line.PointAtStart, line.PointAtStart + Vector3d.ZAxis * zVals[1])), new GH_Path(branchIdx));
+                }          
 
                 //=========================================
                 // 4. Create volumes from springer surfaces and Z-lines
@@ -278,8 +279,11 @@ namespace VoussoirPlugin03.Components
                         }
                     }
                 }
+            }
 
-
+            for (int i = 0; i < almostSpringers.PathCount; i++)
+            {
+                
             }
 
             //==============================
