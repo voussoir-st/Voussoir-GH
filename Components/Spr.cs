@@ -286,7 +286,7 @@ namespace VoussoirPlugin03.Components
                 
             }
 
-            //==============================/
+            //==============================
             // Separate rest voussoirs
             //==============================
             var tol = RhinoDoc.ActiveDoc.ModelAbsoluteTolerance;
