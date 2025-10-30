@@ -187,6 +187,28 @@ namespace VoussoirPlugin03.Components
 
             return trimmedTree;
         }
+        public static void SplitTreeAt<T>(GH_Structure<T> inputTree, int splitIndex,
+                                  out GH_Structure<T> treeA, out GH_Structure<T> treeB)
+    where T : IGH_Goo
+        {
+            treeA = new GH_Structure<T>();
+            treeB = new GH_Structure<T>();
+
+            for (int i = 0; i < inputTree.Branches.Count; i++)
+            {
+                var path = inputTree.Paths[i];
+                var branch = inputTree.Branches[i];
+
+                int count = branch.Count;
+                int split = Math.Max(0, Math.Min(splitIndex, count));
+
+                var listA = branch.Take(split).ToList();
+                var listB = branch.Skip(split).ToList();
+
+                treeA.AppendRange(listA, path);
+                treeB.AppendRange(listB, path);
+            }
+        }
 
     }
     public class VoussoirCreate : GH_Component
@@ -304,34 +326,18 @@ namespace VoussoirPlugin03.Components
             //==============================
             var almostSpringers = new GH_Structure<GH_Brep>();
             var restVoussoirs = new GH_Structure<GH_Brep>();
-            var inVoussoirs = new GH_Structure<GH_Brep>();
+
 
             //==============================
             // Main loop over springer lines
             //==============================
+            GH_Structure<GH_Brep> springerVoussoirs = new GH_Structure<GH_Brep>();
 
 
-            foreach (var line in spLines)
+            //foreach (var line in spLines)
+            for (int ispringer = 0; ispringer < spLines.Count; ispringer++)
             {
-                // Extrude line to create vertical reference
-                var extrusionBrep = Brep.CreateFromSurface(Surface.CreateExtrusion(line, Vector3d.ZAxis * 10));
-
-                // Intersect with voussoirs
-                var intersectedVoussoirs = new GH_Structure<GH_Brep>();
-                foreach (var branchIdx in Enumerable.Range(0, remappedVoussoirs.Branches.Count))
-                {
-                    var branch = remappedVoussoirs.Branches[branchIdx];
-                    foreach (var ghBrep in branch)
-                    {
-                        if (ghBrep?.Value == null) continue;
-                        if (Rhino.Geometry.Intersect.Intersection.BrepBrep(ghBrep.Value, extrusionBrep, RhinoMath.ZeroTolerance, out Curve[] curves, out Point3d[] pts)
-                            && (curves.Length > 0 || pts.Length > 0))
-                        {
-                            intersectedVoussoirs.Append(ghBrep, new GH_Path(branchIdx));
-                            inVoussoirs.Append(ghBrep, new GH_Path(branchIdx));
-                        }
-                    }
-                }
+                var line = spLines[ispringer];
 
                 // Compute base surfaces (springerSurfaces)
                 var spPlane = new Plane(line.PointAtStart, line.PointAtEnd - line.PointAtStart, Vector3d.ZAxis);
@@ -341,6 +347,8 @@ namespace VoussoirPlugin03.Components
 
                 var offsetLine = new Line(line.PointAtStart + spPlane.ZAxis * spWidth, line.PointAtEnd + spPlane.ZAxis * spWidth);
                 offsetLine.Extend(20, 20);
+
+
 
                 var springerLines = new List<Line>();
 
@@ -355,14 +363,64 @@ namespace VoussoirPlugin03.Components
                     }
                 }
 
-                var springerSurfacesLocal = new GH_Structure<GH_Brep>();
+                var springerLinesLocal = new GH_Structure<GH_Curve>();
 
                 for (int i = 0; i < springerLines.Count - 1; i++)
                 {
-                    var lofts = Brep.CreateFromLoft(new List<Curve> { springerLines[i].ToNurbsCurve(), springerLines[i + 1].ToNurbsCurve() }, Point3d.Unset, Point3d.Unset, LoftType.Normal, false);
-                    if (lofts != null && lofts.Length > 0) springerSurfacesLocal.Append(new GH_Brep(lofts[0]), new GH_Path(i));
+                    var lines = new List<GH_Curve> { new GH_Curve(springerLines[i].ToNurbsCurve()), new GH_Curve(springerLines[i + 1].ToNurbsCurve()) };
+                    springerLinesLocal.AppendRange(lines, new GH_Path(i));
                 }
 
+                // Extrude line to create vertical reference
+                var extrusionBrep = Brep.CreateFromSurface(Surface.CreateExtrusion(line, Vector3d.ZAxis * 10));
+
+                // Intersect with voussoirs
+                var intersectedVoussoirs = new GH_Structure<GH_Brep>();
+                foreach (var branchIdx in Enumerable.Range(0, remappedVoussoirs.Branches.Count))
+                {
+                    var branch = remappedVoussoirs.Branches[branchIdx];
+                    foreach (var ghBrep in branch)
+                    {
+                        var voussoir = ghBrep.Value;
+                        var points = voussoir.Vertices;
+                        var truepoints = new List<Point3d>();
+                        foreach (var point in points)
+                        {
+                            if (spPlane.DistanceTo(point.Location) > 0) truepoints.Add(point.Location);
+                        }
+                        if (truepoints.Count > 0) intersectedVoussoirs.Append(ghBrep, remappedVoussoirs.Paths[branchIdx]);
+                    }
+                }
+
+                int maxCount = intersectedVoussoirs.Branches.Max(b => b.Count);
+
+                
+                for (int i = 0; i < remappedVoussoirs.Branches.Count; i++)
+                {
+                    var rowVoussoirs = remappedVoussoirs.Branches[i];
+
+                    if (ispringer == 0)
+                    {
+                        for (int j = 0; j < maxCount; j++)
+                        {
+                            var brep = rowVoussoirs[j];
+                            var sp = brep.Value;
+                            springerVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
+                        }
+                    }
+                    if (ispringer == 1)
+                    {
+                        for (int j = 0; j < maxCount; j++)
+                        {
+                            var brep = rowVoussoirs[rowVoussoirs.Count - 1 - j];
+                            var sp = brep.Value;
+                            springerVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
+                        }
+                    }
+
+                }
+
+                
                 // Compute Z lines
                 var secondZlineLocal = new GH_Structure<GH_Line>();
                 foreach (var branchIdx in Enumerable.Range(0, intersectedVoussoirs.Branches.Count))
@@ -374,11 +432,12 @@ namespace VoussoirPlugin03.Components
                 }
 
             }
+            
             //==============================
             // Output
             //==============================
-            DA.SetDataTree(0, almostSpringers);
-            DA.SetDataTree(1, inVoussoirs);
+            DA.SetDataTree(0, springerVoussoirs);
+            //DA.SetDataTree(1, inVoussoirs);
             //DA.SetDataTree(2, voussoirPoints);
         }
     }  
