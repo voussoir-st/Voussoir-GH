@@ -2,14 +2,193 @@
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino;
+using Rhino.Display;
 using Rhino.Geometry;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Rhino.Geometry.Intersect;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
 
 namespace VoussoirPlugin03.Components
 {
+    public static class TreeUtils
+    {
+        /// <summary>
+        /// Partitions each branch of a GH_Structure into sub-branches of a given size.
+        /// Equivalent to the Grasshopper "Partition List" component, applied branch-wise.
+        /// </summary>
+        public static GH_Structure<T> PartitionTree<T>(
+            GH_Structure<T> inputTree, 
+            int partitionSize)
+            where T : IGH_Goo
+        {
+            if (partitionSize < 1)
+                throw new ArgumentException("Partition size must be at least 1.", nameof(partitionSize));
+            GH_Structure<T> partitionedTree = new GH_Structure<T>();
+            for (int i = 0; i < inputTree.PathCount; i++)
+            {
+                var path = inputTree.get_Path(i);
+                var branch = inputTree.Branches[i];
+                for (int j = 0; j < branch.Count; j += partitionSize)
+                {
+                    int count = Math.Min(partitionSize, branch.Count - j);
+                    var chunk = branch.GetRange(j, count);
+                    var newPath = path.AppendElement(j / partitionSize);
+                    foreach (var item in chunk)
+                        partitionedTree.Append(item, newPath);
+                }
+            }
+            return partitionedTree;
+        }
+        public static GH_Structure<T> DuplicateBranchElements<T>(GH_Structure<T> inputTree)
+            where T : class, IGH_Goo, new()
+        {
+            GH_Structure<T> duplicatedTree = new GH_Structure<T>();
+
+            for (int i = 0; i < inputTree.PathCount; i++)
+            {
+                var path = inputTree.get_Path(i);
+                var branch = inputTree.Branches[i];
+
+                foreach (var item in branch)
+                {
+                    // Duplicate safely
+                    T dup1 = item.Duplicate() as T;
+                    T dup2 = item.Duplicate() as T;
+
+                    // Only append non-null items
+                    if (dup1 != null) duplicatedTree.Append(dup1, path);
+                    if (dup2 != null) duplicatedTree.Append(dup2, path);
+                }
+            }
+
+            return duplicatedTree;
+        }
+        /// <summary>
+        /// Finds the closest points on curves for a tree of points and a tree of curves.
+        /// Mimics the Grasshopper Curve Closest Point component.
+        /// </summary>
+        public static void CurveClosestPointTree(
+            GH_Structure<GH_Point> pointsTree,
+            GH_Structure<GH_Curve> curvesTree,
+            out GH_Structure<GH_Point> closestPointsTree,
+            out GH_Structure<GH_Number> closestParamsTree,
+            out GH_Structure<GH_Number> distancesTree)
+        {
+            closestPointsTree = new GH_Structure<GH_Point>();
+            closestParamsTree = new GH_Structure<GH_Number>();
+            distancesTree = new GH_Structure<GH_Number>();
+
+            for (int i = 0; i < pointsTree.PathCount; i++)
+            {
+                var ptPath = pointsTree.get_Path(i);
+                var ptBranch = pointsTree.Branches[i];
+
+                // Use the corresponding curve branch
+                var curveBranch = curvesTree.Branches[i];
+
+                foreach (var ghPt in ptBranch)
+                {
+                    Point3d pt;
+                    ghPt.CastTo(out pt);
+
+                    double minDist = double.MaxValue;
+                    Point3d closestPt = Point3d.Unset;
+                    double closestParam = 0.0;
+
+                    foreach (var ghCrv in curveBranch)
+                    {
+                        Curve crv = ghCrv.Value;
+                        
+                        if (crv == null) continue;
+
+                        double t;
+                        if (crv.ClosestPoint(pt, out t))
+                        {
+                            Point3d p = crv.PointAt(t);
+                            double d = pt.DistanceTo(p);
+                            if (d < minDist)
+                            {
+                                minDist = d;
+                                closestPt = p;
+                                closestParam = t;
+                            }
+                        }
+                    }
+
+                    closestPointsTree.Append(new GH_Point(closestPt), ptPath);
+                    closestParamsTree.Append(new GH_Number(closestParam), ptPath);
+                    distancesTree.Append(new GH_Number(minDist), ptPath);
+                }
+            }
+        }
+        /// <summary>
+        /// Sorts a tree of values according to a tree of numeric keys (branch by branch).
+        /// Mimics the Grasshopper Sort List component.
+        /// </summary>
+        public static GH_Structure<T> SortListTree<T>(
+            GH_Structure<GH_Number> keysTree,
+            GH_Structure<T> valuesTree) where T : IGH_Goo
+        {
+            if (keysTree.PathCount != valuesTree.PathCount)
+                throw new ArgumentException("Trees must have the same number of branches.");
+
+            GH_Structure<T> sortedTree = new GH_Structure<T>();
+
+            for (int i = 0; i < keysTree.PathCount; i++)
+            {
+                var path = keysTree.get_Path(i);
+                var keys = keysTree.Branches[i].Select(x => x.Value).ToList();
+                var values = valuesTree.Branches[i];
+
+                if (keys.Count != values.Count)
+                    throw new ArgumentException($"Branch {i} has mismatched lengths.");
+
+                // Create list of tuples
+                List<(T value, double key)> pairs = new List<(T, double)>();
+                for (int j = 0; j < keys.Count; j++)
+                    pairs.Add((values[j], keys[j]));
+
+                // Sort iteratively
+                pairs.Sort((a, b) => a.key.CompareTo(b.key));
+
+                foreach (var p in pairs)
+                    sortedTree.Append(p.value, path);
+            }
+
+            return sortedTree;
+        }
+        public static GH_Structure<T> TrimTreeDepth<T>(GH_Structure<T> tree) where T : IGH_Goo
+        {
+            var trimmedTree = new GH_Structure<T>();
+
+            foreach (var path in tree.Paths)
+            {
+                var branch = tree.get_Branch(path);
+                GH_Path newPath;
+                Debug.WriteLine($"branch: " + path);
+                if (path.Length > 1)
+                {
+                    int[] parentIndices = path.Indices.Take(path.Length - 1).ToArray();
+                    newPath = new GH_Path(parentIndices);
+                }
+                else
+                {
+                    newPath = path;
+                }
+                Debug.WriteLine($"newPath: " + newPath);
+                foreach (T item in branch.Cast<T>())
+                    trimmedTree.Append(item, newPath);
+            }
+
+            return trimmedTree;
+        }
+
+    }
     public class VoussoirCreate : GH_Component
     {
         public VoussoirCreate()
@@ -33,7 +212,7 @@ namespace VoussoirPlugin03.Components
         {
             pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
             pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddBrepParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
+            pManager.AddCurveParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -280,11 +459,133 @@ namespace VoussoirPlugin03.Components
                     }
                 }
             }
+            //==============================
+            // Build Voussoirs
+            //==============================
+
+            GH_Structure<GH_Brep> matchingFacesTree = new GH_Structure<GH_Brep>();
+
+            double tolerance = Rhino.RhinoMath.DefaultAngleTolerance;
 
             for (int i = 0; i < almostSpringers.PathCount; i++)
             {
-                
+                var path = almostSpringers.get_Path(i);
+                var branch = almostSpringers.Branches[i];
+
+                foreach (GH_Brep g in almostSpringers.Branches[i])
+                {
+                    Brep brep = g.Value; // Get the actual Brep
+                    
+                    // Filter faces whose planes are contained in tPlanes
+                    var matchingFaces = brep.Faces
+                        .Cast<BrepFace>()
+                        .Where(f =>
+                        {
+                            Plane facePlane;
+                            if (f.TryGetPlane(out facePlane))
+                            {
+                                // check against all planes in tPlanes
+                                foreach (var ghPlane in tPlanes) // tPlanes is List<GH_Plane>
+                                {
+                                    Plane p = ghPlane.Value; // Extract the Rhino.Geometry.Plane from GH_Plane
+                                    // Normals are parallel
+                                    if (facePlane.Normal.IsParallelTo(p.Normal, tolerance) != 0)
+                                    {
+                                        // Distance from origin of one plane to the other plane is small
+                                        if (Math.Abs(facePlane.DistanceTo(p.Origin)) < Rhino.RhinoMath.ZeroTolerance)
+                                        {
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                            return false;
+                        })
+                        .Select(f => new GH_Brep(f.DuplicateFace(false)))
+                        .ToList();
+
+                    foreach (var face in matchingFaces)
+                    {
+                        matchingFacesTree.Append(face, path);
+                    }
+                }
             }
+
+            int partitionSize = 2;
+            GH_Structure<GH_Brep> partitionedfacesTree = TreeUtils.PartitionTree(matchingFacesTree, partitionSize);
+            partitionedfacesTree.Graft(GH_GraftMode.GraftAll);
+
+            GH_Structure<GH_Curve> edgesTree = new GH_Structure<GH_Curve>();
+            
+            Debug.WriteLine($"Original tree has {edgesTree.PathCount} paths");
+            
+
+            GH_Structure <GH_Point> edgesPointsTree = new GH_Structure<GH_Point>();
+
+            for (int i = 0; i < partitionedfacesTree.PathCount; i++)
+            {
+                var path = partitionedfacesTree.get_Path(i);
+                var branch = partitionedfacesTree.Branches[i];
+
+                foreach (var ghSurface in branch)
+                {
+                    Brep brep = ghSurface.Value;
+                    Curve[] edgeCurves = brep.DuplicateEdgeCurves(false);
+
+                    var joinedCurves = Curve.JoinCurves(edgeCurves);
+                    foreach (var curve in joinedCurves)
+                    {
+                        edgesTree.Append(new GH_Curve(curve), path);
+                    }
+                    edgesPointsTree.AppendRange(
+                        brep.Vertices.Select(v => new GH_Point(v.Location)),
+                        path
+                    );
+                }
+            }
+
+            GH_Structure<GH_Curve> trimmedEdgesTree = TreeUtils.TrimTreeDepth(edgesTree);
+            Debug.WriteLine($"Trimmed tree has {trimmedEdgesTree.PathCount} paths");
+
+            var dupSpLines = new GH_Structure<GH_Curve>();
+
+            for (int i = 0; i < matchingFacesTree.PathCount; i++)
+            {
+                dupSpLines.AppendRange(spLines.Select(c => new GH_Curve(c)));
+            }
+            
+            GH_Structure<GH_Curve> dupSpLinesPTree = TreeUtils.PartitionTree(dupSpLines, 2);
+            dupSpLinesPTree.Simplify(GH_SimplificationMode.CollapseAllOverlaps);
+            dupSpLinesPTree.Graft(GH_GraftMode.GraftAll);
+
+            GH_Structure<GH_Curve> dupSpLinesPTree2 = TreeUtils.DuplicateBranchElements(dupSpLinesPTree);
+            dupSpLinesPTree2.Graft(GH_GraftMode.GraftAll);
+
+            GH_Structure<GH_Point> closestPointsTree = new GH_Structure<GH_Point>();
+            GH_Structure<GH_Number> closestParamsTree = new GH_Structure<GH_Number>();
+            GH_Structure<GH_Number> distancesTree = new GH_Structure<GH_Number>();
+
+            TreeUtils.CurveClosestPointTree(edgesPointsTree, dupSpLinesPTree2, out closestPointsTree, out closestParamsTree, out distancesTree);
+            GH_Structure<GH_Point> sortedPointsTree = TreeUtils.SortListTree(distancesTree, closestPointsTree);
+            GH_Structure<GH_Point> firstPointsTree = new GH_Structure<GH_Point>();
+
+            for (int i = 0; i < sortedPointsTree.PathCount; i++)
+            {
+                var path = sortedPointsTree.get_Path(i);
+                var branch = sortedPointsTree.Branches[i];
+
+                if (branch.Count > 0)
+                    firstPointsTree.Append(branch[0], path);
+            }
+            
+            GH_Structure<GH_Point> trimmed = TreeUtils.TrimTreeDepth(firstPointsTree);
+
+            GH_Structure<GH_Point> a = new GH_Structure<GH_Point>();
+            GH_Structure<GH_Number> pr = new GH_Structure<GH_Number>();
+            GH_Structure<GH_Number> bc = new GH_Structure<GH_Number>();
+
+            TreeUtils.CurveClosestPointTree(trimmed, trimmedEdgesTree, out a, out pr, out bc);
+
 
             //==============================
             // Separate rest voussoirs
@@ -313,8 +614,8 @@ namespace VoussoirPlugin03.Components
             // Output
             //==============================
             DA.SetDataTree(0, almostSpringers);
-            DA.SetDataTree(1, restVoussoirs);
-            //DA.SetDataTree(2, almostSpringers);
+            DA.SetDataTree(1, inVoussoirs);
+            DA.SetDataTree(2, trimmedEdgesTree);
         }
-    }
+    }  
 }

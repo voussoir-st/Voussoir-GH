@@ -55,8 +55,7 @@ namespace Components
         private Curve BuildCatenary(Point3d start, Point3d end, double rise, int samples)
         {
             if (samples < 3) samples = 3;
-            //var startXY = new Point2d(start.X, start.Y);
-            //var endXY = new Point2d(end.X, end.Y);
+            
             Vector3d dirXY = end - start;
             double L = start.DistanceTo(end);
             if (L < Rhino.RhinoMath.ZeroTolerance)
@@ -64,11 +63,7 @@ namespace Components
             dirXY.Unitize();
             var mid = 0.5 * (start + end);
             double a = SolveCatenaryA(L, rise);
-            //if (double.IsNaN(a) || a <= 0)
-            //{
-            //    Point3d apex = new Point3d(midXY.X, midXY.Y, Math.Max(start.Z, end.Z) + rise);
-            //    return NurbsCurve.CreateInterpolatedCurve(new[] { start, apex, end }, 2);
-            //}
+            
             var pts = new List<Point3d>(samples);
             for (int i = 0; i < samples; i++)
             {
