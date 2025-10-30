@@ -212,7 +212,7 @@ namespace VoussoirPlugin03.Components
         {
             pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
             pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
-            pManager.AddCurveParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
+            //pManager.AddPointParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -309,10 +309,10 @@ namespace VoussoirPlugin03.Components
             //==============================
             // Main loop over springer lines
             //==============================
-            
+
 
             foreach (var line in spLines)
-            {                              
+            {
                 // Extrude line to create vertical reference
                 var extrusionBrep = Brep.CreateFromSurface(Surface.CreateExtrusion(line, Vector3d.ZAxis * 10));
 
@@ -324,7 +324,7 @@ namespace VoussoirPlugin03.Components
                     foreach (var ghBrep in branch)
                     {
                         if (ghBrep?.Value == null) continue;
-                        if (Rhino.Geometry.Intersect.Intersection.BrepBrep(ghBrep.Value, extrusionBrep, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance, out Curve[] curves, out Point3d[] pts)
+                        if (Rhino.Geometry.Intersect.Intersection.BrepBrep(ghBrep.Value, extrusionBrep, RhinoMath.ZeroTolerance, out Curve[] curves, out Point3d[] pts)
                             && (curves.Length > 0 || pts.Length > 0))
                         {
                             intersectedVoussoirs.Append(ghBrep, new GH_Path(branchIdx));
@@ -371,251 +371,15 @@ namespace VoussoirPlugin03.Components
                     var zVals = branch.SelectMany(b => b.Value.Vertices.Select(v => v.Location.Z)).OrderByDescending(z => z).ToList();
                     if (zVals.Count >= 2)
                         secondZlineLocal.Append(new GH_Line(new Line(line.PointAtStart, line.PointAtStart + Vector3d.ZAxis * zVals[1])), new GH_Path(branchIdx));
-                }          
-
-                //=========================================
-                // 4. Create volumes from springer surfaces and Z-lines
-                //=========================================
-                GH_Structure<GH_Brep> springerVolumes = new GH_Structure<GH_Brep>();
-
-                for (int s = 0; s < springerSurfacesLocal.Paths.Count; s++)
-                {
-                    var surf = springerSurfacesLocal.Branches[s][0].Value;
-                    var hLine = secondZlineLocal.Branches[s][0].Value;
-
-                    // Compute height vector
-                    Vector3d moveVec = Vector3d.ZAxis * hLine.Length;
-
-                    // Duplicate and move surface
-                    Brep surf2 = surf.DuplicateBrep();
-                    surf2.Translate(moveVec);
-
-                    // Create lofted walls between original and moved surface edges
-                    var openBox = surf.Edges
-                        .Select((e, i) => Brep.CreateFromLoft(
-                            new List<Curve> { e.EdgeCurve, surf2.Edges[i].EdgeCurve },
-                            Point3d.Unset, Point3d.Unset, LoftType.Normal, false)?.FirstOrDefault())
-                        .Where(b => b != null)
-                        .ToList();
-
-                    // Combine all parts: top, bottom, and walls
-                    var box = new List<Brep> { surf, surf2 };
-                    box.AddRange(openBox);
-
-                    // Join all into a single Brep volume
-                    Brep joinedBox = Brep.JoinBreps(box, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance)?.FirstOrDefault();
-                    if (joinedBox != null)
-                        springerVolumes.Append(new GH_Brep(joinedBox), new GH_Path(s));
                 }
 
-                //=========================================
-                // 5. Boolean union between volumes and intersected voussoirs
-                //=========================================
-                for (int i = 0; i < springerVolumes.Paths.Count; i++)
-                {
-                    var springerBranch = springerVolumes.Branches[i];
-                    var voussoirBranch = i < intersectedVoussoirs.Branches.Count ? intersectedVoussoirs.Branches[i] : null;
-
-                    // Collect all Breps to union
-                    var toUnion = springerBranch.Select(b => b?.Value)
-                                    .Where(b => b != null)
-                                    .ToList();
-
-                    if (voussoirBranch != null)
-                        toUnion.AddRange(voussoirBranch.Select(b => b?.Value).Where(b => b != null));
-
-                    if (toUnion.Count == 0) continue;
-
-                    try
-                    {
-                        // Attempt Boolean union
-                        var unionResult = Brep.CreateBooleanUnion(toUnion, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
-                        if (unionResult != null && unionResult.Length > 0)
-                        {
-                            foreach (var b in unionResult)
-                            {
-                                b.MergeCoplanarFaces(RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
-                                almostSpringers.Append(new GH_Brep(b), springerVolumes.Paths[i]);
-                            }
-                        }
-                        else
-                        {
-                            // Fallback: just merge coplanar faces of original Breps
-                            foreach (var b in toUnion)
-                            {
-                                b.MergeCoplanarFaces(RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
-                                almostSpringers.Append(new GH_Brep(b), springerVolumes.Paths[i]);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        RhinoApp.WriteLine($"Boolean union failed at path {springerVolumes.Paths[i]}: {ex.Message}");
-                        foreach (var b in toUnion)
-                        {
-                            b.MergeCoplanarFaces(RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
-                            almostSpringers.Append(new GH_Brep(b), springerVolumes.Paths[i]);
-                        }
-                    }
-                }
             }
-            //==============================
-            // Build Voussoirs
-            //==============================
-
-            GH_Structure<GH_Brep> matchingFacesTree = new GH_Structure<GH_Brep>();
-
-            double tolerance = Rhino.RhinoMath.DefaultAngleTolerance;
-
-            for (int i = 0; i < almostSpringers.PathCount; i++)
-            {
-                var path = almostSpringers.get_Path(i);
-                var branch = almostSpringers.Branches[i];
-
-                foreach (GH_Brep g in almostSpringers.Branches[i])
-                {
-                    Brep brep = g.Value; // Get the actual Brep
-                    
-                    // Filter faces whose planes are contained in tPlanes
-                    var matchingFaces = brep.Faces
-                        .Cast<BrepFace>()
-                        .Where(f =>
-                        {
-                            Plane facePlane;
-                            if (f.TryGetPlane(out facePlane))
-                            {
-                                // check against all planes in tPlanes
-                                foreach (var ghPlane in tPlanes) // tPlanes is List<GH_Plane>
-                                {
-                                    Plane p = ghPlane.Value; // Extract the Rhino.Geometry.Plane from GH_Plane
-                                    // Normals are parallel
-                                    if (facePlane.Normal.IsParallelTo(p.Normal, tolerance) != 0)
-                                    {
-                                        // Distance from origin of one plane to the other plane is small
-                                        if (Math.Abs(facePlane.DistanceTo(p.Origin)) < Rhino.RhinoMath.ZeroTolerance)
-                                        {
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
-                            return false;
-                        })
-                        .Select(f => new GH_Brep(f.DuplicateFace(false)))
-                        .ToList();
-
-                    foreach (var face in matchingFaces)
-                    {
-                        matchingFacesTree.Append(face, path);
-                    }
-                }
-            }
-
-            int partitionSize = 2;
-            GH_Structure<GH_Brep> partitionedfacesTree = TreeUtils.PartitionTree(matchingFacesTree, partitionSize);
-            partitionedfacesTree.Graft(GH_GraftMode.GraftAll);
-
-            GH_Structure<GH_Curve> edgesTree = new GH_Structure<GH_Curve>();
-            
-            Debug.WriteLine($"Original tree has {edgesTree.PathCount} paths");
-            
-
-            GH_Structure <GH_Point> edgesPointsTree = new GH_Structure<GH_Point>();
-
-            for (int i = 0; i < partitionedfacesTree.PathCount; i++)
-            {
-                var path = partitionedfacesTree.get_Path(i);
-                var branch = partitionedfacesTree.Branches[i];
-
-                foreach (var ghSurface in branch)
-                {
-                    Brep brep = ghSurface.Value;
-                    Curve[] edgeCurves = brep.DuplicateEdgeCurves(false);
-
-                    var joinedCurves = Curve.JoinCurves(edgeCurves);
-                    foreach (var curve in joinedCurves)
-                    {
-                        edgesTree.Append(new GH_Curve(curve), path);
-                    }
-                    edgesPointsTree.AppendRange(
-                        brep.Vertices.Select(v => new GH_Point(v.Location)),
-                        path
-                    );
-                }
-            }
-
-            GH_Structure<GH_Curve> trimmedEdgesTree = TreeUtils.TrimTreeDepth(edgesTree);
-            Debug.WriteLine($"Trimmed tree has {trimmedEdgesTree.PathCount} paths");
-
-            var dupSpLines = new GH_Structure<GH_Curve>();
-
-            for (int i = 0; i < matchingFacesTree.PathCount; i++)
-            {
-                dupSpLines.AppendRange(spLines.Select(c => new GH_Curve(c)));
-            }
-            
-            GH_Structure<GH_Curve> dupSpLinesPTree = TreeUtils.PartitionTree(dupSpLines, 2);
-            dupSpLinesPTree.Simplify(GH_SimplificationMode.CollapseAllOverlaps);
-            dupSpLinesPTree.Graft(GH_GraftMode.GraftAll);
-
-            GH_Structure<GH_Curve> dupSpLinesPTree2 = TreeUtils.DuplicateBranchElements(dupSpLinesPTree);
-            dupSpLinesPTree2.Graft(GH_GraftMode.GraftAll);
-
-            GH_Structure<GH_Point> closestPointsTree = new GH_Structure<GH_Point>();
-            GH_Structure<GH_Number> closestParamsTree = new GH_Structure<GH_Number>();
-            GH_Structure<GH_Number> distancesTree = new GH_Structure<GH_Number>();
-
-            TreeUtils.CurveClosestPointTree(edgesPointsTree, dupSpLinesPTree2, out closestPointsTree, out closestParamsTree, out distancesTree);
-            GH_Structure<GH_Point> sortedPointsTree = TreeUtils.SortListTree(distancesTree, closestPointsTree);
-            GH_Structure<GH_Point> firstPointsTree = new GH_Structure<GH_Point>();
-
-            for (int i = 0; i < sortedPointsTree.PathCount; i++)
-            {
-                var path = sortedPointsTree.get_Path(i);
-                var branch = sortedPointsTree.Branches[i];
-
-                if (branch.Count > 0)
-                    firstPointsTree.Append(branch[0], path);
-            }
-            
-            GH_Structure<GH_Point> trimmed = TreeUtils.TrimTreeDepth(firstPointsTree);
-
-            GH_Structure<GH_Point> a = new GH_Structure<GH_Point>();
-            GH_Structure<GH_Number> pr = new GH_Structure<GH_Number>();
-            GH_Structure<GH_Number> bc = new GH_Structure<GH_Number>();
-
-            TreeUtils.CurveClosestPointTree(trimmed, trimmedEdgesTree, out a, out pr, out bc);
-
-
-            //==============================
-            // Separate rest voussoirs
-            //==============================
-            var tol = RhinoDoc.ActiveDoc.ModelAbsoluteTolerance;
-            var intersectedData = inVoussoirs.AllData(true).OfType<GH_Brep>()
-                .Where(b => b.Value != null)
-                .Select(b => (Volume: VolumeMassProperties.Compute(b.Value)?.Volume ?? 0, Centroid: AreaMassProperties.Compute(b.Value)?.Centroid ?? Point3d.Unset))
-                .ToList();
-
-            for (int i = 0; i < remappedVoussoirs.Branches.Count; i++)
-            {
-                var path = remappedVoussoirs.Paths[i];
-                foreach (var ghBrep in remappedVoussoirs.Branches[i])
-                {
-                    if (!(ghBrep is GH_Brep brepGoo) || brepGoo.Value == null) continue;
-                    double vol = VolumeMassProperties.Compute(brepGoo.Value)?.Volume ?? 0;
-                    Point3d cen = AreaMassProperties.Compute(brepGoo.Value)?.Centroid ?? Point3d.Unset;
-
-                    if (!intersectedData.Any(d => Math.Abs(d.Volume - vol) < tol && d.Centroid.DistanceTo(cen) < tol))
-                        restVoussoirs.Append(ghBrep, path);
-                }
-            }
-
             //==============================
             // Output
             //==============================
             DA.SetDataTree(0, almostSpringers);
             DA.SetDataTree(1, inVoussoirs);
-            DA.SetDataTree(2, trimmedEdgesTree);
+            //DA.SetDataTree(2, voussoirPoints);
         }
     }  
 }
