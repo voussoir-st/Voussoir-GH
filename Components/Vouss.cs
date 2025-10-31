@@ -348,11 +348,11 @@ namespace Components
                 }
             }
 
-        //=========================================
-        // Voussoirs
-        //=========================================
+            //=========================================
+            // Voussoirs
+            //=========================================
 
-        DataTree<Brep> voussoirs = new DataTree<Brep>();
+            DataTree<Brep> voussoirs = new DataTree<Brep>();
 
             foreach (GH_Path path in contactFaces.Paths)
             {
@@ -385,9 +385,31 @@ namespace Components
                 }
             }
 
+            //==============================
+            // Remap voussoirs tree: {A;B} -> {B}(A)
+            //==============================
+            var remappedVoussoirs = new GH_Structure<GH_Brep>();
+            for (int branchIdx = 0; branchIdx < voussoirs.Paths.Count; branchIdx++)
+            {
+                var oldPath = voussoirs.Paths[branchIdx];
+                var branch = voussoirs.Branches[branchIdx];
+
+                if (oldPath.Indices.Length >= 2)
+                {
+                    int A = oldPath.Indices[0];
+                    int B = oldPath.Indices[1];
+                    for (int i = 0; i < branch.Count; i++)
+                        remappedVoussoirs.Insert(new GH_Brep(branch[i]), new GH_Path(B), A);
+                }
+                else
+                {
+                    foreach (var b in branch) remappedVoussoirs.Append(new GH_Brep(b), oldPath);
+                }
+            }
+            //remappedVoussoirs.Graft(GH_GraftMode.GraftAll);
             //log.Add("bye");
 
-            DA.SetDataTree(0, voussoirs);
+            DA.SetDataTree(0, remappedVoussoirs);
             DA.SetDataTree(2, intradosFaces);
             DA.SetDataTree(1, extradosFaces);
             DA.SetDataTree(3, contactFaces);

@@ -238,6 +238,9 @@ namespace Components
                 DA.SetData(0, null);
             }
 
+            lines.Reverse();
+            Components.Utils.OrientArcs(lines);
+
             // Output the arcs and lines to Grasshopper
             DA.SetDataList(1, arcs); // VA: only arcs
             DA.SetDataList(2, lines); // L: only lines

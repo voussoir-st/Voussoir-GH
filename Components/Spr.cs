@@ -1,4 +1,5 @@
-﻿using Grasshopper.Kernel;
+﻿using Components;
+using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino;
@@ -187,9 +188,12 @@ namespace VoussoirPlugin03.Components
 
             return trimmedTree;
         }
-        public static void SplitTreeAt<T>(GH_Structure<T> inputTree, int splitIndex,
-                                  out GH_Structure<T> treeA, out GH_Structure<T> treeB)
-    where T : IGH_Goo
+        public static void SplitTreeAt<T>(
+            GH_Structure<T> inputTree, 
+            int splitIndex,
+            out GH_Structure<T> treeA, 
+            out GH_Structure<T> treeB)
+            where T : IGH_Goo
         {
             treeA = new GH_Structure<T>();
             treeB = new GH_Structure<T>();
@@ -233,7 +237,7 @@ namespace VoussoirPlugin03.Components
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
             pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
-            pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.item);
             //pManager.AddPointParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
         }
 
@@ -244,34 +248,12 @@ namespace VoussoirPlugin03.Components
             //==============================
             List<Curve> spLines = new List<Curve>();
             if (!DA.GetDataList(0, spLines)) return;
-            GH_Structure<GH_Brep> voussoirs = new GH_Structure<GH_Brep>();
-            if (!DA.GetDataTree(1, out voussoirs)) return;
+            GH_Structure<GH_Brep> remappedVoussoirs = new GH_Structure<GH_Brep>();
+            if (!DA.GetDataTree(1, out remappedVoussoirs)) return;
             List<GH_Plane> tPlanes = new List<GH_Plane>();
             if (!DA.GetDataList(2, tPlanes)) return;
             double spWidth = 0.3;
             if (!DA.GetData(3, ref spWidth)) return;
-
-            //==============================
-            // Remap voussoirs tree: {A;B} -> {B}(A)
-            //==============================
-            var remappedVoussoirs = new GH_Structure<GH_Brep>();
-            foreach (var branchIdx in Enumerable.Range(0, voussoirs.PathCount))
-            {
-                var oldPath = voussoirs.Paths[branchIdx];
-                var branch = voussoirs.Branches[branchIdx];
-
-                if (oldPath.Indices.Length >= 2)
-                {
-                    int A = oldPath.Indices[0];
-                    int B = oldPath.Indices[1];
-                    for (int i = 0; i < branch.Count; i++)
-                        remappedVoussoirs.Insert(branch[i], new GH_Path(B), A);
-                }
-                else
-                {
-                    foreach (var b in branch) remappedVoussoirs.Append(b, oldPath);
-                }
-            }
 
             //==============================
             // Extract extrados faces from voussoirs
@@ -321,6 +303,43 @@ namespace VoussoirPlugin03.Components
                 allVerts.Average(p => p.Z)
             );
 
+            List<Point3d> avgPoints = new List<Point3d>();
+
+            foreach (var branch in remappedVoussoirs.Branches)
+            {
+                foreach (var ghBrep in branch)
+                {
+                    Brep brep = ghBrep.Value;
+                    if (brep == null || brep.Vertices.Count == 0)
+                        continue;
+
+                    double sumX = 0, sumY = 0, sumZ = 0;
+                    foreach (var v in brep.Vertices)
+                    {
+                        sumX += v.Location.X;
+                        sumY += v.Location.Y;
+                        sumZ += v.Location.Z;
+                    }
+
+                    int n = brep.Vertices.Count;
+                    avgPoints.Add(new Point3d(sumX / n, sumY / n, sumZ / n));
+                }
+            }
+
+            List<GeometryBase> geom = avgPoints.Select(p => new Point(p)).Cast<GeometryBase>().ToList();
+            double tolerance = RhinoMath.ZeroTolerance;           
+
+            // Create the patch surface
+            Brep patch = Brep.CreatePatch(
+                geom,
+                null,
+                tolerance
+            );
+            if (patch != null && patch.Faces.Count > 0)
+            {
+                PolylineUtils.AlignNormalToWorldZ(patch.Faces[0].UnderlyingSurface());
+            }
+
             //==============================
             // Initialize output structures
             //==============================
@@ -332,13 +351,14 @@ namespace VoussoirPlugin03.Components
             // Main loop over springer lines
             //==============================
             GH_Structure<GH_Brep> springerVoussoirs = new GH_Structure<GH_Brep>();
-
+            GH_Structure<GH_Brep> extradosTree = new GH_Structure<GH_Brep>();
+            GH_Structure<GH_Brep> intradosTree = new GH_Structure<GH_Brep>();
 
             //foreach (var line in spLines)
             for (int ispringer = 0; ispringer < spLines.Count; ispringer++)
             {
                 var line = spLines[ispringer];
-
+                
                 // Compute base surfaces (springerSurfaces)
                 var spPlane = new Plane(line.PointAtStart, line.PointAtEnd - line.PointAtStart, Vector3d.ZAxis);
                 if (spPlane.DistanceTo(centroid) > 0) spPlane.Flip();
@@ -347,8 +367,6 @@ namespace VoussoirPlugin03.Components
 
                 var offsetLine = new Line(line.PointAtStart + spPlane.ZAxis * spWidth, line.PointAtEnd + spPlane.ZAxis * spWidth);
                 offsetLine.Extend(20, 20);
-
-
 
                 var springerLines = new List<Line>();
 
@@ -388,13 +406,16 @@ namespace VoussoirPlugin03.Components
                         {
                             if (spPlane.DistanceTo(point.Location) > 0) truepoints.Add(point.Location);
                         }
-                        if (truepoints.Count > 0) intersectedVoussoirs.Append(ghBrep, remappedVoussoirs.Paths[branchIdx]);
+                        if (truepoints.Count > 0)
+                        {
+                            intersectedVoussoirs.Append(ghBrep, remappedVoussoirs.Paths[branchIdx]);                           
+                        }
                     }
                 }
 
                 int maxCount = intersectedVoussoirs.Branches.Max(b => b.Count);
+                GH_Structure<GH_Brep> spVoussoirs = new GH_Structure<GH_Brep>();
 
-                
                 for (int i = 0; i < remappedVoussoirs.Branches.Count; i++)
                 {
                     var rowVoussoirs = remappedVoussoirs.Branches[i];
@@ -406,6 +427,7 @@ namespace VoussoirPlugin03.Components
                             var brep = rowVoussoirs[j];
                             var sp = brep.Value;
                             springerVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
+                            spVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
                         }
                     }
                     if (ispringer == 1)
@@ -415,29 +437,151 @@ namespace VoussoirPlugin03.Components
                             var brep = rowVoussoirs[rowVoussoirs.Count - 1 - j];
                             var sp = brep.Value;
                             springerVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
+                            spVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
                         }
                     }
-
                 }
 
                 
-                // Compute Z lines
-                var secondZlineLocal = new GH_Structure<GH_Line>();
-                foreach (var branchIdx in Enumerable.Range(0, intersectedVoussoirs.Branches.Count))
+
+                int ptIndex = 0; // to keep track of avgPoints if it's a flat list
+
+                for (int i = 0; i < spVoussoirs.PathCount; i++)
                 {
-                    var branch = intersectedVoussoirs.Branches[branchIdx];
-                    var zVals = branch.SelectMany(b => b.Value.Vertices.Select(v => v.Location.Z)).OrderByDescending(z => z).ToList();
-                    if (zVals.Count >= 2)
-                        secondZlineLocal.Append(new GH_Line(new Line(line.PointAtStart, line.PointAtStart + Vector3d.ZAxis * zVals[1])), new GH_Path(branchIdx));
+                    GH_Path path = spVoussoirs.get_Path(i);
+                    var branch = spVoussoirs.Branches[i];
+
+                    foreach (var ghBrep in branch)
+                    {
+                        Brep voussoir = ghBrep.Value;
+                        if (voussoir == null)
+                        {
+                            ptIndex++;
+                            continue;
+                        }
+
+                        // 1️⃣ Get average point corresponding to this voussoir
+                        if (ptIndex >= avgPoints.Count)
+                            break;
+
+                        Point3d avgPt = avgPoints[ptIndex];
+                        ptIndex++;
+
+                        // 2️⃣ Find closest point on patch
+                        double u, v;
+                        if (!patch.Faces[0].ClosestPoint(avgPt, out u, out v))
+                            continue;
+
+                        Point3d pt;
+                        Vector3d[] derivatives;
+                        patch.Faces[0].Evaluate(u, v, 1, out pt, out derivatives);
+                        Vector3d patchNormal = Vector3d.CrossProduct(derivatives[0], derivatives[1]);
+                        patchNormal.Unitize();
+
+                        // 3️⃣ Find intrados/extrados faces
+                        double maxDot = double.MinValue;
+                        double minDot = double.MaxValue;
+                        BrepFace extradosFace = null;
+                        BrepFace intradosFace = null;
+
+                        foreach (var face in voussoir.Faces)
+                        {
+                            double midU = face.Domain(0).Mid;
+                            double midV = face.Domain(1).Mid;
+
+                            Vector3d normal = face.NormalAt(midU, midV);
+                            normal.Unitize();
+
+                            double dot = normal * patchNormal;
+
+                            if (dot > maxDot)
+                            {
+                                maxDot = dot;
+                                extradosFace = face;
+                            }
+                            if (dot < minDot)
+                            {
+                                minDot = dot;
+                                intradosFace = face;
+                            }
+                        }
+
+                        // 4️⃣ Add to corresponding trees
+                        if (extradosFace != null)
+                            extradosTree.Append(new GH_Brep(extradosFace.DuplicateFace(false)), path);
+
+                        if (intradosFace != null)
+                            intradosTree.Append(new GH_Brep(intradosFace.DuplicateFace(false)), path);
+                    }
                 }
 
+
+                // Compute Z max
+                double maxZ = double.MinValue;
+
+                foreach (var branch in spVoussoirs.Branches)
+                {
+                    foreach (var ghBrep in branch)
+                    {
+                        var brep = ghBrep.Value;
+                        foreach (var v in brep.Vertices)
+                        {
+                            double z = v.Location.Z;
+                            if (z > maxZ)
+                                maxZ = z;
+                        }
+                    }
+                }
+
+                for (int i = 0; i < remappedVoussoirs.Branches.Count; i++)
+                {
+                    for (int j = 0; j < 2; j++)
+                    {
+                        List<Point3d> spPoints = new List<Point3d>();
+
+                        //Bottom out
+                        Point3d pt1 = Point3d.Unset; 
+                        pt1 = springerLines[i + j].PointAt(1);
+                        spPoints.Add(pt1);
+
+                        //Bottom in
+                        Point3d pt2 = Point3d.Unset; 
+                        pt2 = springerLines[i + j].PointAt(0);
+                        spPoints.Add(pt2);
+
+                        //Intrados * vertical plane
+                        Point3d pt3 = Point3d.Unset;
+
+                        //or
+                        //Intrados * XYPlane
+                        Point3d pt4 = Point3d.Unset;
+
+                        //Intrados middle points
+                        List<Point3d> ptsA = new List<Point3d>();
+
+                        //Voussoir highest
+                        Point3d pt5 = Point3d.Unset;
+
+                        //Top in
+                        Point3d pt6 = Point3d.Unset; 
+                        pt6 = springerLines[i + j].PointAt(0) + Vector3d.ZAxis * maxZ;
+                        spPoints.Add(pt6);
+
+                        //Top out
+                        Point3d pt7 = Point3d.Unset; 
+                        pt7 = springerLines[i + j].PointAt(1) + Vector3d.ZAxis * maxZ;
+                        spPoints.Add(pt7);
+
+                    }
+                }
             }
+            GH_Structure<GH_Brep> trimspringerVoussoirs = TreeUtils.TrimTreeDepth(springerVoussoirs);
             
             //==============================
             // Output
             //==============================
-            DA.SetDataTree(0, springerVoussoirs);
-            //DA.SetDataTree(1, inVoussoirs);
+            DA.SetDataTree(0, intradosTree);
+            DA.SetData(1, patch);
             //DA.SetDataTree(2, voussoirPoints);
         }
     }  
