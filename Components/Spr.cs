@@ -442,43 +442,35 @@ namespace VoussoirPlugin03.Components
                     }
                 }
 
-                
 
-                int ptIndex = 0; // to keep track of avgPoints if it's a flat list
 
                 for (int i = 0; i < spVoussoirs.PathCount; i++)
                 {
                     GH_Path path = spVoussoirs.get_Path(i);
-                    var branch = spVoussoirs.Branches[i];
+                    var voussoirBranch = spVoussoirs.Branches[i];
 
-                    foreach (var ghBrep in branch)
+                    foreach (var vouss in voussoirBranch)
                     {
-                        Brep voussoir = ghBrep.Value;
-                        if (voussoir == null)
-                        {
-                            ptIndex++;
-                            continue;
-                        }
+                        Brep voussoir = vouss.Value;
 
-                        // 1️⃣ Get average point corresponding to this voussoir
-                        if (ptIndex >= avgPoints.Count)
-                            break;
+                        // 1️⃣ Compute centroid (average of vertex positions)
+                        var verts = voussoir.Vertices;
 
-                        Point3d avgPt = avgPoints[ptIndex];
-                        ptIndex++;
+                        Point3d center = Point3d.Origin;
+                        foreach (var c in verts)
+                            center += c.Location;
+                        center /= verts.Count;
 
                         // 2️⃣ Find closest point on patch
                         double u, v;
-                        if (!patch.Faces[0].ClosestPoint(avgPt, out u, out v))
-                            continue;
+                        patch.Faces[0].ClosestPoint(center, out u, out v);
 
                         Point3d pt;
-                        Vector3d[] derivatives;
-                        patch.Faces[0].Evaluate(u, v, 1, out pt, out derivatives);
-                        Vector3d patchNormal = Vector3d.CrossProduct(derivatives[0], derivatives[1]);
-                        patchNormal.Unitize();
+                        Vector3d[] derivs;
+                        var normal = patch.Faces[0].NormalAt(u, v);
+                        normal.Unitize();
 
-                        // 3️⃣ Find intrados/extrados faces
+                        // 3️⃣ Compare each face normal with patch normal
                         double maxDot = double.MinValue;
                         double minDot = double.MaxValue;
                         BrepFace extradosFace = null;
@@ -486,27 +478,25 @@ namespace VoussoirPlugin03.Components
 
                         foreach (var face in voussoir.Faces)
                         {
-                            double midU = face.Domain(0).Mid;
-                            double midV = face.Domain(1).Mid;
+                            double a, b;
+                            face.ClosestPoint(center, out a, out b);
+                            var faceNormal = face.NormalAt(a, b);
+                            faceNormal.Unitize();
+                            double product = normal * faceNormal;
 
-                            Vector3d normal = face.NormalAt(midU, midV);
-                            normal.Unitize();
-
-                            double dot = normal * patchNormal;
-
-                            if (dot > maxDot)
+                            if (product > maxDot)
                             {
-                                maxDot = dot;
+                                maxDot = product;
                                 extradosFace = face;
                             }
-                            if (dot < minDot)
+                            if (product < minDot)
                             {
-                                minDot = dot;
+                                minDot = product;
                                 intradosFace = face;
                             }
                         }
 
-                        // 4️⃣ Add to corresponding trees
+                        // 4️⃣ Append to trees with matching structure
                         if (extradosFace != null)
                             extradosTree.Append(new GH_Brep(extradosFace.DuplicateFace(false)), path);
 
@@ -581,7 +571,7 @@ namespace VoussoirPlugin03.Components
             // Output
             //==============================
             DA.SetDataTree(0, intradosTree);
-            DA.SetData(1, patch);
+            //DA.SetData(1, patch);
             //DA.SetDataTree(2, voussoirPoints);
         }
     }  
