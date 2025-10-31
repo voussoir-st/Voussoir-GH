@@ -351,8 +351,7 @@ namespace VoussoirPlugin03.Components
             // Main loop over springer lines
             //==============================
             GH_Structure<GH_Brep> springerVoussoirs = new GH_Structure<GH_Brep>();
-            GH_Structure<GH_Brep> extradosTree = new GH_Structure<GH_Brep>();
-            GH_Structure<GH_Brep> intradosTree = new GH_Structure<GH_Brep>();
+            
 
             //foreach (var line in spLines)
             for (int ispringer = 0; ispringer < spLines.Count; ispringer++)
@@ -442,7 +441,8 @@ namespace VoussoirPlugin03.Components
                     }
                 }
 
-
+                GH_Structure<GH_Brep> extradosTree = new GH_Structure<GH_Brep>();
+                GH_Structure<GH_Brep> intradosTree = new GH_Structure<GH_Brep>();
 
                 for (int i = 0; i < spVoussoirs.PathCount; i++)
                 {
@@ -464,9 +464,7 @@ namespace VoussoirPlugin03.Components
                         // 2️⃣ Find closest point on patch
                         double u, v;
                         patch.Faces[0].ClosestPoint(center, out u, out v);
-
-                        Point3d pt;
-                        Vector3d[] derivs;
+                                               
                         var normal = patch.Faces[0].NormalAt(u, v);
                         normal.Unitize();
 
@@ -505,7 +503,6 @@ namespace VoussoirPlugin03.Components
                     }
                 }
 
-
                 // Compute Z max
                 double maxZ = double.MinValue;
 
@@ -525,6 +522,46 @@ namespace VoussoirPlugin03.Components
 
                 for (int i = 0; i < remappedVoussoirs.Branches.Count; i++)
                 {
+                    var branchintrados = intradosTree.Branches[i];
+                    var intradospoints1 = new List<Point3d>();
+                    var intradospoints2 = new List<Point3d>();
+                    foreach (var ghBrep in branchintrados)
+                    {
+                        var brep = ghBrep.Value;
+                        var pointsA = new List<Point3d>();
+                        var pointsB = new List<Point3d>();
+
+                        foreach (var v in brep.Vertices)
+                        {
+                            if (tPlanes[i].Value.DistanceTo(v.Location) == 0)
+                                pointsA.Add(v.Location);
+                            else
+                                pointsB.Add(v.Location);
+                            
+                        }
+                        intradospoints1.AddRange(pointsA);
+                        intradospoints2.AddRange(pointsB);
+                    }
+                    var branchextrados = extradosTree.Branches[i];
+                    var extradospoints1 = new List<Point3d>();
+                    var extradospoints2 = new List<Point3d>();
+                    foreach (var ghBrep in branchextrados)
+                    {
+                        var brep = ghBrep.Value;
+                        var pointsA = new List<Point3d>();
+                        var pointsB = new List<Point3d>();
+
+                        foreach (var v in brep.Vertices)
+                        {
+                            if (tPlanes[i].Value.DistanceTo(v.Location) == 0)
+                                pointsA.Add(v.Location);
+                            else
+                                pointsB.Add(v.Location);
+
+                        }
+                        extradospoints1.AddRange(pointsA);
+                        extradospoints2.AddRange(pointsB);
+                    }
                     for (int j = 0; j < 2; j++)
                     {
                         List<Point3d> spPoints = new List<Point3d>();
@@ -548,12 +585,47 @@ namespace VoussoirPlugin03.Components
 
                         //Intrados middle points
                         List<Point3d> ptsA = new List<Point3d>();
+                        if (j == 0)
+                        {
+                            ptsA = intradospoints1;
+                        }
+                        else
+                        {
+                            ptsA = intradospoints2;
+                        }
 
                         //Voussoir highest
                         Point3d pt5 = Point3d.Unset;
-
-                        //Top in
-                        Point3d pt6 = Point3d.Unset; 
+                        if (j == 0)
+                        {
+                            var highest = Point3d.Unset;
+                            var maxh = double.MinValue;
+                            foreach (var p in extradospoints1)
+                            {
+                                if (p.Z > maxh)
+                                {
+                                    maxh = p.Z;
+                                    highest = p;
+                                }
+                            }
+                            pt5 = highest;
+                        }
+                        else
+                        {
+                            var highest = Point3d.Unset;
+                            var maxh = double.MinValue;
+                            foreach (var p in extradospoints2)
+                            {
+                                if (p.Z > maxh)
+                                {
+                                    maxh = p.Z;
+                                    highest = p;
+                                }
+                            }
+                            pt5 = highest;
+                        }
+                            //Top in
+                            Point3d pt6 = Point3d.Unset; 
                         pt6 = springerLines[i + j].PointAt(0) + Vector3d.ZAxis * maxZ;
                         spPoints.Add(pt6);
 
@@ -570,7 +642,7 @@ namespace VoussoirPlugin03.Components
             //==============================
             // Output
             //==============================
-            DA.SetDataTree(0, intradosTree);
+            //DA.SetDataTree(0, intradosTree);
             //DA.SetData(1, patch);
             //DA.SetDataTree(2, voussoirPoints);
         }
