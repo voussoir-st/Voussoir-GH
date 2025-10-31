@@ -539,6 +539,9 @@ namespace VoussoirPlugin03.Components
                                 pointsB.Add(v.Location);
                             
                         }
+                        pointsA = pointsA.OrderBy(pt => pt.Z).ToList();
+                        pointsB = pointsB.OrderBy(pt => pt.Z).ToList();
+
                         intradospoints1.AddRange(pointsA);
                         intradospoints2.AddRange(pointsB);
                     }
@@ -559,6 +562,7 @@ namespace VoussoirPlugin03.Components
                                 pointsB.Add(v.Location);
 
                         }
+                     
                         extradospoints1.AddRange(pointsA);
                         extradospoints2.AddRange(pointsB);
                     }
@@ -578,7 +582,23 @@ namespace VoussoirPlugin03.Components
 
                         //Intrados * vertical plane
                         Point3d pt3 = Point3d.Unset;
+                        for (int a = 0; a < remappedVoussoirs.Branches.Count; a++)
+                        {
+                            var bintrados = intradosTree.Branches[i];
+                            foreach (var intrados in bintrados)
+                            {
+                                Surface srfA = intrados.Value.Surfaces[0];
+                                Surface srfB = extrusionBrep.Surfaces[0];
 
+                                Curve[] intersectionCurves;
+                                Point3d[] intersectionPoints;
+
+                                double tol = RhinoDoc.ActiveDoc.ModelAbsoluteTolerance;
+
+                                bool success = Intersection.SurfaceSurface(srfA, srfB, tol, out intersectionCurves, out intersectionPoints);
+                                
+                            }
+                        }
                         //or
                         //Intrados * XYPlane
                         Point3d pt4 = Point3d.Unset;
@@ -587,10 +607,12 @@ namespace VoussoirPlugin03.Components
                         List<Point3d> ptsA = new List<Point3d>();
                         if (j == 0)
                         {
+                            intradospoints1.RemoveAt(0);
                             ptsA = intradospoints1;
                         }
                         else
                         {
+                            intradospoints2.RemoveAt(0);
                             ptsA = intradospoints2;
                         }
 
@@ -633,6 +655,15 @@ namespace VoussoirPlugin03.Components
                         Point3d pt7 = Point3d.Unset; 
                         pt7 = springerLines[i + j].PointAt(1) + Vector3d.ZAxis * maxZ;
                         spPoints.Add(pt7);
+
+                        var sPoints = new List<Point3d>();
+                        sPoints.Add(pt1);
+                        sPoints.Add(pt2);
+
+                        sPoints.AddRange(ptsA);
+                        sPoints.Add(pt5);
+                        sPoints.Add(pt6);
+                        sPoints.Add(pt7);
 
                     }
                 }
