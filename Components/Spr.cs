@@ -13,6 +13,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using static Rhino.DocObjects.PhysicallyBasedMaterial;
 
 namespace VoussoirPlugin03.Components
 {
@@ -171,7 +172,7 @@ namespace VoussoirPlugin03.Components
             {
                 var branch = tree.get_Branch(path);
                 GH_Path newPath;
-                Debug.WriteLine($"branch: " + path);
+                //Debug.WriteLine($"branch: " + path);
                 if (path.Length > 1)
                 {
                     int[] parentIndices = path.Indices.Take(path.Length - 1).ToArray();
@@ -181,7 +182,7 @@ namespace VoussoirPlugin03.Components
                 {
                     newPath = path;
                 }
-                Debug.WriteLine($"newPath: " + newPath);
+                //Debug.WriteLine($"newPath: " + newPath);
                 foreach (T item in branch.Cast<T>())
                     trimmedTree.Append(item, newPath);
             }
@@ -213,6 +214,65 @@ namespace VoussoirPlugin03.Components
                 treeB.AppendRange(listB, path);
             }
         }
+        public static Brep LoftBySegments(Curve crvA, Curve crvB, double tol = 1e-6)
+        {
+            // 1. Explode both curves into polyline segments
+            var segsA = ExplodeToSegments(crvA);
+            var segsB = ExplodeToSegments(crvB);
+
+            // Ensure same number of segments
+            if (segsA.Count != segsB.Count)
+                throw new System.Exception("Curves have different segment counts — cannot pair segments.");
+
+            var breps = new List<Brep>();
+
+            // 2. Loft corresponding segments
+            for (int i = 0; i < segsA.Count; i++)
+            {
+                var segA = segsA[i];
+                var segB = segsB[i];
+
+                // Create the loft between the two straight segments
+                var loft = Brep.CreateFromLoft(
+                    new List<Curve> { segA, segB },
+                    Point3d.Unset,
+                    Point3d.Unset,
+                    LoftType.Straight,
+                    false
+                );
+
+                if (loft != null && loft.Any())
+                    breps.Add(loft.First());
+            }
+
+            // 3. Optionally join all segment lofts into one Brep
+            var joined = Brep.JoinBreps(breps, tol);
+            return joined != null && joined.Any() ? joined.First() : null;
+        }
+        public static List<Curve> ExplodeToSegments(Curve crv)
+        {
+            // Try to get polyline representation
+            if (crv.TryGetPolyline(out Polyline pl))
+            {
+                var segs = new List<Curve>();
+                for (int i = 0; i < pl.Count - 1; i++)
+                    segs.Add(new LineCurve(pl[i], pl[i + 1]));
+                return segs;
+            }
+
+            // Otherwise, explode the curve (handles polylines, polycurves, etc.)
+            var exploded = crv.DuplicateSegments()?.ToList();
+            if (exploded != null && exploded.Count > 0)
+                return exploded;
+
+            // Fallback: divide and create linear approximations
+            var pts = crv.DivideEquidistant(10);
+            if (pts == null || pts.Length < 2) return new List<Curve>();
+            var lines = new List<Curve>();
+            for (int i = 0; i < pts.Length - 1; i++)
+                lines.Add(new LineCurve(pts[i], pts[i + 1]));
+            return lines;
+        }
 
     }
     public class VoussoirCreate : GH_Component
@@ -237,7 +297,7 @@ namespace VoussoirPlugin03.Components
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
             pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
-            pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.item);
+            pManager.AddCurveParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
             //pManager.AddPointParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
         }
 
@@ -343,7 +403,7 @@ namespace VoussoirPlugin03.Components
             //==============================
             // Initialize output structures
             //==============================
-            var almostSpringers = new GH_Structure<GH_Brep>();
+            var springers = new GH_Structure<GH_Brep>();
             var restVoussoirs = new GH_Structure<GH_Brep>();
 
 
@@ -351,11 +411,12 @@ namespace VoussoirPlugin03.Components
             // Main loop over springer lines
             //==============================
             GH_Structure<GH_Brep> springerVoussoirs = new GH_Structure<GH_Brep>();
-            
-
+            var ptpt = new GH_Structure<GH_Curve>();
+            var lcounter = 0;
             //foreach (var line in spLines)
             for (int ispringer = 0; ispringer < spLines.Count; ispringer++)
             {
+                Debug.WriteLine($"\n\nlcounter: " + lcounter);
                 var line = spLines[ispringer];
                 
                 // Compute base surfaces (springerSurfaces)
@@ -414,7 +475,6 @@ namespace VoussoirPlugin03.Components
 
                 int maxCount = intersectedVoussoirs.Branches.Max(b => b.Count);
                 GH_Structure<GH_Brep> spVoussoirs = new GH_Structure<GH_Brep>();
-
                 for (int i = 0; i < remappedVoussoirs.Branches.Count; i++)
                 {
                     var rowVoussoirs = remappedVoussoirs.Branches[i];
@@ -426,7 +486,7 @@ namespace VoussoirPlugin03.Components
                             var brep = rowVoussoirs[j];
                             var sp = brep.Value;
                             springerVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
-                            spVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
+                            spVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));                            
                         }
                     }
                     if (ispringer == 1)
@@ -533,14 +593,20 @@ namespace VoussoirPlugin03.Components
 
                         foreach (var v in brep.Vertices)
                         {
-                            if (tPlanes[i].Value.DistanceTo(v.Location) == 0)
+                            if (Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)) < 1e-6)
+                            {
+                                //Debug.WriteLine($"pointsA Distance: " + tPlanes[i].Value.DistanceTo(v.Location));
                                 pointsA.Add(v.Location);
+                            }
                             else
                                 pointsB.Add(v.Location);
                             
                         }
                         pointsA = pointsA.OrderBy(pt => pt.Z).ToList();
                         pointsB = pointsB.OrderBy(pt => pt.Z).ToList();
+
+                        //Debug.WriteLine($"pointsA: " + pointsA.Count);
+                        //Debug.WriteLine($"pointsB: " + pointsB.Count);
 
                         intradospoints1.AddRange(pointsA);
                         intradospoints2.AddRange(pointsB);
@@ -556,7 +622,7 @@ namespace VoussoirPlugin03.Components
 
                         foreach (var v in brep.Vertices)
                         {
-                            if (tPlanes[i].Value.DistanceTo(v.Location) == 0)
+                            if (Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)) < 1e-6)
                                 pointsA.Add(v.Location);
                             else
                                 pointsB.Add(v.Location);
@@ -566,8 +632,11 @@ namespace VoussoirPlugin03.Components
                         extradospoints1.AddRange(pointsA);
                         extradospoints2.AddRange(pointsB);
                     }
+                    var linecounter = 0;
+                    var polylines = new List<Curve>();
                     for (int j = 0; j < 2; j++)
                     {
+                        Debug.WriteLine($"\nlinecounter: " + linecounter);
                         List<Point3d> spPoints = new List<Point3d>();
 
                         //Bottom out
@@ -605,6 +674,7 @@ namespace VoussoirPlugin03.Components
 
                         //Intrados middle points
                         List<Point3d> ptsA = new List<Point3d>();
+                        //Debug.WriteLine($"intradospoints1: " + intradospoints1.Count);
                         if (j == 0)
                         {
                             intradospoints1.RemoveAt(0);
@@ -656,25 +726,77 @@ namespace VoussoirPlugin03.Components
                         pt7 = springerLines[i + j].PointAt(1) + Vector3d.ZAxis * maxZ;
                         spPoints.Add(pt7);
 
-                        var sPoints = new List<Point3d>();
-                        sPoints.Add(pt1);
-                        sPoints.Add(pt2);
+                        var sPoints = new List<GH_Point>();
+                        sPoints.Add(new GH_Point(pt1));
+                        sPoints.Add(new GH_Point(pt2));
 
-                        sPoints.AddRange(ptsA);
-                        sPoints.Add(pt5);
-                        sPoints.Add(pt6);
-                        sPoints.Add(pt7);
+                        sPoints.AddRange(ptsA.Select(p => new GH_Point(p)));
+                        sPoints.Add(new GH_Point(pt5));
+                        sPoints.Add(new GH_Point(pt6));
+                        sPoints.Add(new GH_Point(pt7));
+                        sPoints.Add(new GH_Point(pt1));
+
+                        //Debug.WriteLine($"sPoints: " + sPoints.Count);
+                        var pts = sPoints.Select(p => p.Value).ToList();
+                        var curve = new PolylineCurve(new Polyline(pts));
+                        polylines.Add(curve);
+                        
+                        linecounter++;
+                    }
+                    foreach (var poly in polylines)
+                    {
+                        ptpt.Append(new GH_Curve(poly), new GH_Path(i));
+                        Debug.WriteLine($"ptpt: " + ptpt.PathCount);
 
                     }
+                    Debug.WriteLine($"polylines: " + polylines.Count);
+
+                    var sSpringer = TreeUtils.LoftBySegments(polylines[0], polylines[1]);
+                    var face1 = Brep.CreatePlanarBreps(polylines[0], RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+                    var face2 = Brep.CreatePlanarBreps(polylines[1], RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+
+                    var springerlist = new List<Brep>();
+                    springerlist.Add(face1[0]);
+                    springerlist.Add(sSpringer);
+                    springerlist.Add(face2[0]);
+
+                    var joinedSpringer = Brep.JoinBreps(springerlist, RhinoMath.ZeroTolerance);
+                    //Debug.WriteLine($"sSpringer: " + sSpringer.);
+
+                    springers.Append(new GH_Brep(joinedSpringer[0]), new GH_Path(i));
                 }
+                lcounter++;
             }
             GH_Structure<GH_Brep> trimspringerVoussoirs = TreeUtils.TrimTreeDepth(springerVoussoirs);
-            
+
+            //==============================
+            // Separate rest voussoirs
+            //==============================
+            var intersectedData = springerVoussoirs.Branches[0];
+            var number = intersectedData.Count;
+            var toRemove = number / 2;
+
+            for (int i = 0; i < remappedVoussoirs.Branches.Count; i++)
+            {
+                var path = remappedVoussoirs.Paths[i];
+                var branch = remappedVoussoirs.Branches[i];
+
+                // Skip branches too short
+                if (branch.Count <= 2 * toRemove)
+                    continue;
+
+                // Keep only the middle range
+                var kept = branch.Skip(toRemove).Take(branch.Count - 2 * toRemove).ToList();
+
+                foreach (var brep in kept)
+                    restVoussoirs.Append(brep, path);
+            }
+
             //==============================
             // Output
             //==============================
-            //DA.SetDataTree(0, intradosTree);
-            //DA.SetData(1, patch);
+            DA.SetDataTree(0, springers);
+            DA.SetDataTree(1, restVoussoirs);
             //DA.SetDataTree(2, voussoirPoints);
         }
     }  

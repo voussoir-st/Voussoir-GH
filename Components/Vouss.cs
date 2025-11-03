@@ -91,7 +91,7 @@ namespace Components
                 var branchGoo = divPlanes.get_Branch(path);
                 if (branchGoo == null || branchGoo.Count != 4)
                 {
-                    RhinoApp.WriteLine($"Branch {path} doesn't have 4 elements ({branchGoo?.Count ?? 0} found).");
+                    //RhinoApp.WriteLine($"Branch {path} doesn't have 4 elements ({branchGoo?.Count ?? 0} found).");
                     continue;
                 }
 
