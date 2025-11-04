@@ -284,6 +284,8 @@ namespace Components
                 }
             }
 
+            panelPlanesTree.Graft(GH_GraftMode.GraftAll);
+
             DA.SetDataTree(0, panelPlanesTree);
             DA.SetDataTree(1, divisionPlanesTree);
             DA.SetDataList(3, longitudinalPlanes);

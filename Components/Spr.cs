@@ -449,6 +449,8 @@ namespace VoussoirPlugin03.Components
             var ptpt = new GH_Structure<GH_Curve>(); 
             var lcounter = 0; // just a debug counter to track iterations
 
+            var removed0 = new GH_Structure<GH_Brep>();
+            var removed1 = new GH_Structure<GH_Brep>();
 
             // Loop through each springer line
             for (int ispringer = 0; ispringer < spLines.Count; ispringer++)
@@ -563,6 +565,7 @@ namespace VoussoirPlugin03.Components
                             var sp = brep.Value;
                             springerVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
                             spVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
+                            removed0.Append(new GH_Brep(sp), new GH_Path(i));                            
                         }
                     }
 
@@ -575,6 +578,7 @@ namespace VoussoirPlugin03.Components
                             var sp = brep.Value;
                             springerVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
                             spVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
+                            removed1.Append(new GH_Brep(sp), new GH_Path(i));
                         }
                     }
                 }
@@ -868,21 +872,24 @@ namespace VoussoirPlugin03.Components
             //==============================
             // Separate the remaining voussoirs (not part of springers)
             //==============================
-            var intersectedData = springerVoussoirs.Branches[0];
-            var number = intersectedData.Count;
-            var toRemove = number / 2; // Half of each branch will be considered springers
-
             for (int i = 0; i < remappedVoussoirs.Branches.Count; i++)
             {
                 var path = remappedVoussoirs.Paths[i];
                 var branch = remappedVoussoirs.Branches[i];
 
+                // Determine how many to remove on each side
+                int removeLeft = (i < removed0.Branches.Count) ? removed0.Branches[i].Count : 0;
+                int removeRight = (i < removed1.Branches.Count) ? removed1.Branches[i].Count : 0;
+
                 // Skip small branches (not enough voussoirs)
-                if (branch.Count <= 2 * toRemove)
+                if (branch.Count <= removeLeft + removeRight)
                     continue;
 
-                // Keep only the middle voussoirs (excluding both springers)
-                var kept = branch.Skip(toRemove).Take(branch.Count - 2 * toRemove).ToList();
+                // Keep only the middle voussoirs
+                var kept = branch
+                    .Skip(removeLeft)
+                    .Take(branch.Count - removeLeft - removeRight)
+                    .ToList();
 
                 foreach (var brep in kept)
                     restVoussoirs.Append(brep, path);
