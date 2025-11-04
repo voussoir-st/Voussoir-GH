@@ -13,6 +13,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Windows.Forms;
 using static Rhino.DocObjects.PhysicallyBasedMaterial;
 
 namespace VoussoirPlugin03.Components
@@ -206,9 +207,9 @@ namespace VoussoirPlugin03.Components
             var segsA = ExplodeToSegments(crvA);
             var segsB = ExplodeToSegments(crvB);
 
-            // Ensure same number of segments
-            if (segsA.Count != segsB.Count)
-                throw new System.Exception("Curves have different segment counts — cannot pair segments.");
+            //// Ensure same number of segments
+            //if (segsA.Count != segsB.Count)
+            //    throw new System.Exception("Curves have different segment counts — cannot pair segments.");
 
             var breps = new List<Brep>();
 
@@ -274,6 +275,7 @@ namespace VoussoirPlugin03.Components
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
+            pManager.AddBrepParameter("Vault Surface", "VaultSurface", "Surface that defines the vault", GH_ParamAccess.item);
             pManager.AddCurveParameter("Springer Line", "SpringerLine", "List of base lines to create vault springers", GH_ParamAccess.list);
             pManager.AddBrepParameter("Voussoirs", "Voussoirs", "Voussoirs to analyse", GH_ParamAccess.tree);
             pManager.AddPlaneParameter("Transversal Planes", "TransversalPlanes", "Planes at each span division", GH_ParamAccess.list);
@@ -294,21 +296,24 @@ namespace VoussoirPlugin03.Components
             //==============================
 
             // Get input 0: list of springer base lines (probably defining arch boundaries or divisions)
+            Brep surface = null;
+            if (!DA.GetData(0, ref surface)) return; // If missing, stop execution
+
+            // Get input 0: list of springer base lines (probably defining arch boundaries or divisions)
             List<Curve> spLines = new List<Curve>();
-            if (!DA.GetDataList(0, spLines)) return; // If missing, stop execution
+            if (!DA.GetDataList(1, spLines)) return; // If missing, stop execution
 
             // Get input 1: data tree containing remapped voussoirs (stone blocks as Breps)
             GH_Structure<GH_Brep> remappedVoussoirs = new GH_Structure<GH_Brep>();
-            if (!DA.GetDataTree(1, out remappedVoussoirs)) return;
+            if (!DA.GetDataTree(2, out remappedVoussoirs)) return;
 
             // Get input 2: list of target planes, probably defining horizontal layers or construction levels
             List<GH_Plane> tPlanes = new List<GH_Plane>();
-            if (!DA.GetDataList(2, tPlanes)) return;
+            if (!DA.GetDataList(3, tPlanes)) return;
 
             // Get input 3: width of the springer section (initial default = 0.3 units)
             double spWidth = 0.3;
-            if (!DA.GetData(3, ref spWidth)) return;
-
+            if (!DA.GetData(4, ref spWidth)) return;
 
             //==============================
             // Extract extrados faces from voussoirs
@@ -329,7 +334,6 @@ namespace VoussoirPlugin03.Components
                     extrados.Append(new GH_Brep(extrBrep), new GH_Path(0));
                 }
             }
-
 
             //==============================
             // Compute closest points & planar distance
@@ -363,7 +367,6 @@ namespace VoussoirPlugin03.Components
             // If the initial width is smaller than the found planar distance, expand it
             if (spWidth < planarDistance) spWidth = planarDistance;
 
-
             //==============================
             // Compute centroid of all vertices
             //==============================
@@ -381,7 +384,6 @@ namespace VoussoirPlugin03.Components
                 allVerts.Average(p => p.Y),
                 allVerts.Average(p => p.Z)
             );
-
 
             //==============================
             // Compute average point for each voussoir
@@ -412,20 +414,8 @@ namespace VoussoirPlugin03.Components
                 }
             }
 
-
-            //==============================
-            // Create patch surface through average points
-            //==============================
-
-            List<GeometryBase> geom = avgPoints.Select(p => new Point(p)).Cast<GeometryBase>().ToList();
-            double tolerance = RhinoMath.ZeroTolerance; // Use Rhino's minimal tolerance for precision
-
             // Create a Brep patch that fits the input points
-            Brep patch = Brep.CreatePatch(
-                geom,
-                null,
-                tolerance
-            );
+            Brep patch = surface;
 
             if (patch != null && patch.Faces.Count > 0)
             {
@@ -451,7 +441,6 @@ namespace VoussoirPlugin03.Components
             var springers = new GH_Structure<GH_Brep>();
             var restVoussoirs = new GH_Structure<GH_Brep>();
 
-
             //==============================
             // Main loop over springer lines
             //==============================
@@ -459,6 +448,7 @@ namespace VoussoirPlugin03.Components
             GH_Structure<GH_Brep> springerVoussoirs = new GH_Structure<GH_Brep>();
             var ptpt = new GH_Structure<GH_Curve>(); 
             var lcounter = 0; // just a debug counter to track iterations
+
 
             // Loop through each springer line
             for (int ispringer = 0; ispringer < spLines.Count; ispringer++)
@@ -690,14 +680,16 @@ namespace VoussoirPlugin03.Components
                         var brep = ghBrep.Value;
                         var pointsA = new List<Point3d>();
                         var pointsB = new List<Point3d>();
+                        Debug.WriteLine($"brep vert: " + brep.Vertices.Count);
 
                         // Split vertices into two groups depending on which side of the tPlane they are
                         foreach (var v in brep.Vertices)
                         {
-                            if (Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)) < 1e-6)
+                            if (Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)) < 1e-3)
                             {
                                 // Vertex lies directly on the plane
                                 pointsA.Add(v.Location);
+                                Debug.WriteLine($"z: " + Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)));
                             }
                             else
                                 pointsB.Add(v.Location);
@@ -725,12 +717,12 @@ namespace VoussoirPlugin03.Components
 
                         foreach (var v in brep.Vertices)
                         {
-                            if (Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)) < 1e-6)
+                            if (Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)) < 0.001)
                                 pointsA.Add(v.Location);
                             else
                                 pointsB.Add(v.Location);
                         }
-
+                        Debug.WriteLine($"pointsA: " + pointsA.Count);
                         extradospoints1.AddRange(pointsA);
                         extradospoints2.AddRange(pointsB);
                     }
@@ -740,10 +732,12 @@ namespace VoussoirPlugin03.Components
                     //==============================
                     var linecounter = 0;
                     var polylines = new List<Curve>();
+                    var springerDefLines0 = new List<Line>();
+                    var springerDefLines1 = new List<Line>();
 
                     for (int j = 0; j < 2; j++) // two sides per voussoir row
                     {
-                        Debug.WriteLine($"\nlinecounter: " + linecounter);
+                        //Debug.WriteLine($"\nlinecounter: " + linecounter);
                         List<Point3d> spPoints = new List<Point3d>();
 
                         // --- Bottom outer point (lower edge of springer) ---
@@ -754,42 +748,33 @@ namespace VoussoirPlugin03.Components
                         Point3d pt2 = springerLines[i + j].PointAt(0);
                         spPoints.Add(pt2);
 
-                        // --- Intrados intersection with vertical extrusion (currently only computed, not used) ---
-                        Point3d ptB = Point3d.Unset;
+                        //// --- Intrados intersection with vertical extrusion (currently only computed, not used) ---
+                        //Point3d ptB = Point3d.Unset;
 
-                        for (int a = 0; a < remappedVoussoirs.Branches.Count; a++)
-                        {
-                            var bintrados = intradosTree.Branches[i];
-                            foreach (var intrados in bintrados)
-                            {
-                                Surface srfA = intrados.Value.Surfaces[0];
-                                Surface srfB = extrusionBrep.Surfaces[0];
+                        //for (int a = 0; a < remappedVoussoirs.Branches.Count; a++)
+                        //{
+                        //    var bintrados = intradosTree.Branches[i];
+                        //    foreach (var intrados in bintrados)
+                        //    {
+                        //        Surface srfA = intrados.Value.Surfaces[0];
+                        //        Surface srfB = extrusionBrep.Surfaces[0];
 
-                                Curve[] intersectionCurves;
-                                Point3d[] intersectionPoints;
+                        //        Curve[] intersectionCurves;
+                        //        Point3d[] intersectionPoints;
 
-                                double tol = RhinoDoc.ActiveDoc.ModelAbsoluteTolerance;
+                        //        double tol = RhinoDoc.ActiveDoc.ModelAbsoluteTolerance;
 
-                                bool success = Intersection.SurfaceSurface(srfA, srfB, tol, out intersectionCurves, out intersectionPoints);
-                                // intersectionCurves and intersectionPoints could later define pt3
-                            }
-                        }
+                        //        bool success = Intersection.SurfaceSurface(srfA, srfB, tol, out intersectionCurves, out intersectionPoints);
+                        //        // intersectionCurves and intersectionPoints could later define pt3
+                        //    }
+                        //}
 
-                        // Optional: Intrados * XYPlane intersection placeholder
-                        
+                        //// Optional: Intrados * XYPlane intersection placeholder
 
                         // --- Intrados midpoints (used to trace interior profile) ---
                         List<Point3d> ptsA = new List<Point3d>();
-                        if (j == 0)
-                        {
-                            intradospoints1.RemoveAt(0);
-                            ptsA = intradospoints1;
-                        }
-                        else
-                        {
-                            intradospoints2.RemoveAt(0);
-                            ptsA = intradospoints2;
-                        }
+                        ptsA = (j == 0) ? intradospoints1.Skip(1).ToList() : intradospoints2.Skip(1).ToList();
+
 
                         // --- Determine the highest point from extrados vertices ---
                         Point3d pt5 = Point3d.Unset;
@@ -841,11 +826,11 @@ namespace VoussoirPlugin03.Components
                         sPoints.Add(new GH_Point(pt7));
                         sPoints.Add(new GH_Point(pt1)); // close polyline loop
 
-                        // Convert GH_Points to Rhino Points and then to PolylineCurve
+                        //Convert GH_Points to Rhino Points and then to PolylineCurve
                         var pts = sPoints.Select(p => p.Value).ToList();
                         var curve = new PolylineCurve(new Polyline(pts));
                         polylines.Add(curve);
-
+                        Debug.WriteLine($"polylines: " + polylines.Count);
                         linecounter++;
                     }
 
@@ -855,9 +840,9 @@ namespace VoussoirPlugin03.Components
                     foreach (var poly in polylines)
                     {
                         ptpt.Append(new GH_Curve(poly), new GH_Path(i));
-                        Debug.WriteLine($"ptpt: " + ptpt.PathCount);
+                        //Debug.WriteLine($"ptpt: " + ptpt.PathCount);
                     }
-                    Debug.WriteLine($"polylines: " + polylines.Count);
+                    //Debug.WriteLine($"polylines: " + polylines.Count);
 
                     // Loft between the two polylines to form the springer’s body
                     var sSpringer = TreeUtils.LoftBySegments(polylines[0], polylines[1]);
@@ -877,6 +862,7 @@ namespace VoussoirPlugin03.Components
                     // Append to final springers output
                     springers.Append(new GH_Brep(joinedSpringer[0]), new GH_Path(i));
                 }
+                lcounter++;
             }
 
             //==============================
@@ -901,7 +887,6 @@ namespace VoussoirPlugin03.Components
                 foreach (var brep in kept)
                     restVoussoirs.Append(brep, path);
             }
-
 
             //==============================
             // Output results to Grasshopper
