@@ -42,13 +42,6 @@ namespace Components
             pManager.AddPlaneParameter("Intrados Planes", "IntradosPlanes", "Intrados planar vault panels", GH_ParamAccess.tree);
             pManager.AddPlaneParameter("Division planes", "DivisionPlanes", "Planes of each Voussoir Contact Surface", GH_ParamAccess.tree);
             pManager.AddNumberParameter("Voussoir Thickness", "Thickness", "User defined Voussoir Thickness", GH_ParamAccess.item, 0.3);
-
-            // Set IntradosPlanes parameter to Grafted mode
-            var intradosPlanesParam = pManager[0] as Param_Plane;
-            if (intradosPlanesParam != null)
-            {
-               intradosPlanesParam.DataMapping = GH_DataMapping.Graft;
-            }
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
