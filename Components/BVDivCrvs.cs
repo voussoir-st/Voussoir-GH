@@ -133,9 +133,9 @@ namespace Components
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
             pManager.AddSurfaceParameter("Vault Surface", "VS", "The lofted base surface between the two arcs.", GH_ParamAccess.item);
-            pManager.AddCurveParameter("Vault Arcs", "VA", "The 2 generated arcs.", GH_ParamAccess.list);
+            pManager.AddCurveParameter("Springer Lines", "SL", "The 2 Horizontal lines (remaining sides).", GH_ParamAccess.list);
             pManager.HideParameter(1);
-            pManager.AddCurveParameter("Lines", "L", "The 2 Horizontal lines (remaining sides).", GH_ParamAccess.list);
+            pManager.AddCurveParameter("Vault Arcs", "VA", "The 2 generated arcs.", GH_ParamAccess.list);
             pManager.HideParameter(2);
         }
 
@@ -242,8 +242,8 @@ namespace Components
             Components.Utils.OrientArcs(lines);
 
             // Output the arcs and lines to Grasshopper
-            DA.SetDataList(1, arcs); // VA: only arcs
-            DA.SetDataList(2, lines); // L: only lines
+            DA.SetDataList(1, lines); // L: only lines
+            DA.SetDataList(2, arcs); // VA: only arcs
         }
 
         private Curve BuildSpanCurve(Point3d start, Point3d end, double h, int mode)
