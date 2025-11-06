@@ -473,6 +473,15 @@ namespace VoussoirPlugin03.Components
                 var offsetLine = new Line(line.PointAtStart + spPlane.ZAxis * spWidth, line.PointAtEnd + spPlane.ZAxis * spWidth);
                 offsetLine.Extend(20, 20); // Extend both ends for safety (ensures intersection with planes)
 
+                var basePlane = new Plane(line.PointAtStart, line.PointAtEnd, offsetLine.PointAt(0));
+                var baseZ = basePlane.ZAxis;
+                baseZ.Unitize();
+
+                if (baseZ.Z < 0)
+                {
+                    basePlane.Flip();
+                }
+
                 // Container for computed springer lines between tPlanes
                 var springerLines = new List<Line>();
 
@@ -663,11 +672,14 @@ namespace VoussoirPlugin03.Components
                         foreach (var v in brep.Vertices)
                         {
                             double z = v.Location.Z;
+                            Debug.WriteLine($"z: " + z);
                             if (z > maxZ)
                                 maxZ = z;
                         }
                     }
                 }
+                Debug.WriteLine($"\nmaxZ: " + maxZ);
+
 
                 //==============================
                 // Loop through each voussoir branch (per springer)
@@ -684,7 +696,7 @@ namespace VoussoirPlugin03.Components
                         var brep = ghBrep.Value;
                         var pointsA = new List<Point3d>();
                         var pointsB = new List<Point3d>();
-                        Debug.WriteLine($"brep vert: " + brep.Vertices.Count);
+                        //Debug.WriteLine($"brep vert: " + brep.Vertices.Count);
 
                         // Split vertices into two groups depending on which side of the tPlane they are
                         foreach (var v in brep.Vertices)
@@ -693,7 +705,7 @@ namespace VoussoirPlugin03.Components
                             {
                                 // Vertex lies directly on the plane
                                 pointsA.Add(v.Location);
-                                Debug.WriteLine($"z: " + Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)));
+                                //Debug.WriteLine($"z: " + Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)));
                             }
                             else
                                 pointsB.Add(v.Location);
@@ -726,7 +738,7 @@ namespace VoussoirPlugin03.Components
                             else
                                 pointsB.Add(v.Location);
                         }
-                        Debug.WriteLine($"pointsA: " + pointsA.Count);
+                        //Debug.WriteLine($"pointsA: " + pointsA.Count);
                         extradospoints1.AddRange(pointsA);
                         extradospoints2.AddRange(pointsB);
                     }
@@ -812,10 +824,14 @@ namespace VoussoirPlugin03.Components
                         }
 
                         // --- Top inner & outer points (raised by maxZ) ---
-                        Point3d pt6 = springerLines[i + j].PointAt(0) + Vector3d.ZAxis * maxZ;
+                        var pt6x = springerLines[i + j].PointAt(0).X;
+                        var pt6y = springerLines[i + j].PointAt(0).Y;
+                        Point3d pt6 = new Point3d(pt6x, pt6y, maxZ);
                         spPoints.Add(pt6);
 
-                        Point3d pt7 = springerLines[i + j].PointAt(1) + Vector3d.ZAxis * maxZ;
+                        var pt7x = springerLines[i + j].PointAt(1).X;
+                        var pt7y = springerLines[i + j].PointAt(1).Y;
+                        Point3d pt7 = new Point3d(pt7x, pt7y, maxZ);
                         spPoints.Add(pt7);
 
                         //==============================
@@ -834,7 +850,7 @@ namespace VoussoirPlugin03.Components
                         var pts = sPoints.Select(p => p.Value).ToList();
                         var curve = new PolylineCurve(new Polyline(pts));
                         polylines.Add(curve);
-                        Debug.WriteLine($"polylines: " + polylines.Count);
+                        //Debug.WriteLine($"polylines: " + polylines.Count);
                         linecounter++;
                     }
 
@@ -852,8 +868,8 @@ namespace VoussoirPlugin03.Components
                     var sSpringer = TreeUtils.LoftBySegments(polylines[0], polylines[1]);
 
                     // Cap top and bottom faces with planar surfaces
-                    var face1 = Brep.CreatePlanarBreps(polylines[0], RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
-                    var face2 = Brep.CreatePlanarBreps(polylines[1], RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+                    var face1 = Brep.CreatePlanarBreps(polylines[0], RhinoMath.ZeroTolerance);
+                    var face2 = Brep.CreatePlanarBreps(polylines[1], RhinoMath.ZeroTolerance);
 
                     // Join loft + faces into a closed brep
                     var springerlist = new List<Brep>();
