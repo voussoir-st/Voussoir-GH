@@ -119,7 +119,7 @@ namespace Components
             pManager.AddNumberParameter("Vault Height", "VaultHeight", "Arc's Height.", GH_ParamAccess.item, 2.0);
             //pManager.AddBooleanParameter("Span Direction", "SpanDirection", "0 = arcs on sides 0-1 and 2-3; 1 = arcs on sides 1-2 and 3-0.", GH_ParamAccess.item, true);
             pManager.AddIntegerParameter("Arc Selection", "VaultProfile",
-                "Right-click to select type of curve\n\nParabola = 0\nArc = 1\nCatenary = 2\n\n... or input one of the above integers", GH_ParamAccess.item, 2);
+                "Right-click to select type of curve\n\nParabola = 0\nArc = 1\nCatenary = 2\n\n... or input one of the above integers", GH_ParamAccess.item, 1);
 
             var param = (Param_Integer)pManager[2];
             param.AddNamedValue("Parabola", 0);
