@@ -16,7 +16,7 @@
   
   <PropertyGroup>
     <!-- Specifies information for Assembly and Yak -->
-    <Version>0.2.2-alpha</Version>
+    <Version>0.2.3-alpha</Version>
     <Title>Voussoir</Title>
     <Company>STBIM</Company>
     <Description>Grasshopper plugin to design stereotomic vaults.</Description>
