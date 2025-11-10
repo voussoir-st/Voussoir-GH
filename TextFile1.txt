@@ -1,7 +1,4 @@
-# Voussoir
-![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)
-![License](https://img.shields.io/badge/license-MIT-blue)
-
+﻿# Voussoir
 Voussoir is a Grasshopper plugin for Rhino that generates stereotomic vault geometries from user-defined inputs.
 
 ## Installation
@@ -15,6 +12,7 @@ Voussoir is a Grasshopper plugin for Rhino that generates stereotomic vault geom
 3. Click install and restart Rhino and Grasshopper.
 
 4. The plugin should now appear in Grasshopper's component toolbar.
+
 
 ### Installation with .gha file
 
@@ -46,9 +44,11 @@ Voussoir is a Grasshopper plugin for Rhino that generates stereotomic vault geom
 
 - Grasshopper
 
+
 ## License
 
 This project is licensed under the MIT License.
+
 
 ## Contact
 
