@@ -23,7 +23,7 @@
     <Authors>STBIM</Authors>
     <PackageId>Voussoir-GH</PackageId>
     <PackageTags>Architecture; Parametrization; Vaults; Sterotomy</PackageTags>
-    <PackageProjectUrl>https://stbim.arq.up.pt</PackageProjectUrl>
+    <PackageProjectUrl>https://www.food4rhino.com/en/app/voussoir</PackageProjectUrl>
     <RepositoryType>git</RepositoryType>
     <PackageIcon>Voussoir02</PackageIcon>
     <AssemblyName>Voussoir-GH</AssemblyName>
