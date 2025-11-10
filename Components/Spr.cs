@@ -538,7 +538,7 @@ namespace VoussoirPlugin03.Components
                         // Keep vertices that are above the current springer plane
                         foreach (var point in points)
                         {
-                            if (spPlane.DistanceTo(point.Location) >= 0 && spPlane.DistanceTo(point.Location) <= -0.001)
+                            if (spPlane.DistanceTo(point.Location) >= 0 || spPlane.DistanceTo(point.Location) >= -0.01)
                                 truepoints.Add(point.Location);
                         }
 
