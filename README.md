@@ -18,7 +18,7 @@ Voussoir is a Grasshopper plugin for Rhino that generates stereotomic vault geom
 
 ### Installation with .gha file
 
-1. Download the latest release from \[Food4Rhino](https://github.com/voussoir-st/Voussoir-GH.git).
+1. Download the latest release from \[Food4Rhino].
 
 2. Open Rhino and Grasshopper.
 
