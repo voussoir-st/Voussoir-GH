@@ -22,7 +22,7 @@ namespace Components
                 "BVDivG",
                 "Divides a vault defined by two arcs into spanwise and lengthwise voussoirs.",
                 "Voussoir",
-                "Vault Creation"
+                "Core Geometry"
                 )
         { }
 

@@ -94,7 +94,7 @@ namespace Components
             "BVSrf",
             "Creates the base surface for the creation of a barrel vault",
             "Voussoir",
-            "Vault Creation"
+            "Core Geometry"
           )
         {
         }

@@ -23,7 +23,7 @@ namespace Components
                "BVouss",
                "Creates Voussoirs based on predefined planes.",
                "Voussoir",
-               "Vault Creation"
+               "Core Geometry"
                )
         { }
 

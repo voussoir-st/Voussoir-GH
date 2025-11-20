@@ -18,261 +18,17 @@ using static Rhino.DocObjects.PhysicallyBasedMaterial;
 
 namespace VoussoirPlugin03.Components
 {
-    public static class TreeUtils
+    public class VoussoirCreate1 : GH_Component
     {
-        /// <summary>
-        /// Partitions each branch of a GH_Structure into sub-branches of a given size.
-        /// Equivalent to the Grasshopper "Partition List" component, applied branch-wise.
-        /// </summary>
-        public static GH_Structure<T> PartitionTree<T>(GH_Structure<T> inputTree, int partitionSize)
-            where T : IGH_Goo
-        {
-            if (partitionSize < 1)
-                throw new ArgumentException("Partition size must be at least 1.", nameof(partitionSize));
-            GH_Structure<T> partitionedTree = new GH_Structure<T>();
-            for (int i = 0; i < inputTree.PathCount; i++)
-            {
-                var path = inputTree.get_Path(i);
-                var branch = inputTree.Branches[i];
-                for (int j = 0; j < branch.Count; j += partitionSize)
-                {
-                    int count = Math.Min(partitionSize, branch.Count - j);
-                    var chunk = branch.GetRange(j, count);
-                    var newPath = path.AppendElement(j / partitionSize);
-                    foreach (var item in chunk)
-                        partitionedTree.Append(item, newPath);
-                }
-            }
-            return partitionedTree;
-        }
-        public static GH_Structure<T> DuplicateBranchElements<T>(GH_Structure<T> inputTree)
-            where T : class, IGH_Goo, new()
-        {
-            GH_Structure<T> duplicatedTree = new GH_Structure<T>();
-
-            for (int i = 0; i < inputTree.PathCount; i++)
-            {
-                var path = inputTree.get_Path(i);
-                var branch = inputTree.Branches[i];
-
-                foreach (var item in branch)
-                {
-                    // Duplicate safely
-                    T dup1 = item.Duplicate() as T;
-                    T dup2 = item.Duplicate() as T;
-
-                    // Only append non-null items
-                    if (dup1 != null) duplicatedTree.Append(dup1, path);
-                    if (dup2 != null) duplicatedTree.Append(dup2, path);
-                }
-            }
-
-            return duplicatedTree;
-        }
-        /// <summary>
-        /// Finds the closest points on curves for a tree of points and a tree of curves.
-        /// Mimics the Grasshopper Curve Closest Point component.
-        /// </summary>
-        public static void CurveClosestPointTree(GH_Structure<GH_Point> pointsTree, GH_Structure<GH_Curve> curvesTree, out GH_Structure<GH_Point> closestPointsTree, out GH_Structure<GH_Number> closestParamsTree,  out GH_Structure<GH_Number> distancesTree)
-        {
-            closestPointsTree = new GH_Structure<GH_Point>();
-            closestParamsTree = new GH_Structure<GH_Number>();
-            distancesTree = new GH_Structure<GH_Number>();
-
-            for (int i = 0; i < pointsTree.PathCount; i++)
-            {
-                var ptPath = pointsTree.get_Path(i);
-                var ptBranch = pointsTree.Branches[i];
-
-                // Use the corresponding curve branch
-                var curveBranch = curvesTree.Branches[i];
-
-                foreach (var ghPt in ptBranch)
-                {
-                    Point3d pt;
-                    ghPt.CastTo(out pt);
-
-                    double minDist = double.MaxValue;
-                    Point3d closestPt = Point3d.Unset;
-                    double closestParam = 0.0;
-
-                    foreach (var ghCrv in curveBranch)
-                    {
-                        Curve crv = ghCrv.Value;
-                        
-                        if (crv == null) continue;
-
-                        double t;
-                        if (crv.ClosestPoint(pt, out t))
-                        {
-                            Point3d p = crv.PointAt(t);
-                            double d = pt.DistanceTo(p);
-                            if (d < minDist)
-                            {
-                                minDist = d;
-                                closestPt = p;
-                                closestParam = t;
-                            }
-                        }
-                    }
-
-                    closestPointsTree.Append(new GH_Point(closestPt), ptPath);
-                    closestParamsTree.Append(new GH_Number(closestParam), ptPath);
-                    distancesTree.Append(new GH_Number(minDist), ptPath);
-                }
-            }
-        }
-        /// <summary>
-        /// Sorts a tree of values according to a tree of numeric keys (branch by branch).
-        /// Mimics the Grasshopper Sort List component.
-        /// </summary>
-        public static GH_Structure<T> SortListTree<T>(GH_Structure<GH_Number> keysTree, GH_Structure<T> valuesTree) where T : IGH_Goo
-        {
-            if (keysTree.PathCount != valuesTree.PathCount)
-                throw new ArgumentException("Trees must have the same number of branches.");
-
-            GH_Structure<T> sortedTree = new GH_Structure<T>();
-
-            for (int i = 0; i < keysTree.PathCount; i++)
-            {
-                var path = keysTree.get_Path(i);
-                var keys = keysTree.Branches[i].Select(x => x.Value).ToList();
-                var values = valuesTree.Branches[i];
-
-                if (keys.Count != values.Count)
-                    throw new ArgumentException($"Branch {i} has mismatched lengths.");
-
-                // Create list of tuples
-                List<(T value, double key)> pairs = new List<(T, double)>();
-                for (int j = 0; j < keys.Count; j++)
-                    pairs.Add((values[j], keys[j]));
-
-                // Sort iteratively
-                pairs.Sort((a, b) => a.key.CompareTo(b.key));
-
-                foreach (var p in pairs)
-                    sortedTree.Append(p.value, path);
-            }
-
-            return sortedTree;
-        }
-        public static GH_Structure<T> TrimTreeDepth<T>(GH_Structure<T> tree) where T : IGH_Goo
-        {
-            var trimmedTree = new GH_Structure<T>();
-
-            foreach (var path in tree.Paths)
-            {
-                var branch = tree.get_Branch(path);
-                GH_Path newPath;
-                //Debug.WriteLine($"branch: " + path);
-                if (path.Length > 1)
-                {
-                    int[] parentIndices = path.Indices.Take(path.Length - 1).ToArray();
-                    newPath = new GH_Path(parentIndices);
-                }
-                else
-                {
-                    newPath = path;
-                }
-                //Debug.WriteLine($"newPath: " + newPath);
-                foreach (T item in branch.Cast<T>())
-                    trimmedTree.Append(item, newPath);
-            }
-
-            return trimmedTree;
-        }
-        public static void SplitTreeAt<T>(GH_Structure<T> inputTree, int splitIndex, out GH_Structure<T> treeA, out GH_Structure<T> treeB) where T : IGH_Goo
-        {
-            treeA = new GH_Structure<T>();
-            treeB = new GH_Structure<T>();
-
-            for (int i = 0; i < inputTree.Branches.Count; i++)
-            {
-                var path = inputTree.Paths[i];
-                var branch = inputTree.Branches[i];
-
-                int count = branch.Count;
-                int split = Math.Max(0, Math.Min(splitIndex, count));
-
-                var listA = branch.Take(split).ToList();
-                var listB = branch.Skip(split).ToList();
-
-                treeA.AppendRange(listA, path);
-                treeB.AppendRange(listB, path);
-            }
-        }
-        public static Brep LoftBySegments(Curve crvA, Curve crvB, double tol = 1e-6)
-        {
-            // 1. Explode both curves into polyline segments
-            var segsA = ExplodeToSegments(crvA);
-            var segsB = ExplodeToSegments(crvB);
-
-            //// Ensure same number of segments
-            //if (segsA.Count != segsB.Count)
-            //    throw new System.Exception("Curves have different segment counts — cannot pair segments.");
-
-            var breps = new List<Brep>();
-
-            // 2. Loft corresponding segments
-            for (int i = 0; i < segsA.Count; i++)
-            {
-                var segA = segsA[i];
-                var segB = segsB[i];
-
-                // Create the loft between the two straight segments
-                var loft = Brep.CreateFromLoft(
-                    new List<Curve> { segA, segB },
-                    Point3d.Unset,
-                    Point3d.Unset,
-                    LoftType.Straight,
-                    false
-                );
-
-                if (loft != null && loft.Any())
-                    breps.Add(loft.First());
-            }
-
-            // 3. Optionally join all segment lofts into one Brep
-            var joined = Brep.JoinBreps(breps, tol);
-            return joined != null && joined.Any() ? joined.First() : null;
-        }
-        public static List<Curve> ExplodeToSegments(Curve crv)
-        {
-            // Try to get polyline representation
-            if (crv.TryGetPolyline(out Polyline pl))
-            {
-                var segs = new List<Curve>();
-                for (int i = 0; i < pl.Count - 1; i++)
-                    segs.Add(new LineCurve(pl[i], pl[i + 1]));
-                return segs;
-            }
-
-            // Otherwise, explode the curve (handles polylines, polycurves, etc.)
-            var exploded = crv.DuplicateSegments()?.ToList();
-            if (exploded != null && exploded.Count > 0)
-                return exploded;
-
-            // Fallback: divide and create linear approximations
-            var pts = crv.DivideEquidistant(10);
-            if (pts == null || pts.Length < 2) return new List<Curve>();
-            var lines = new List<Curve>();
-            for (int i = 0; i < pts.Length - 1; i++)
-                lines.Add(new LineCurve(pts[i], pts[i + 1]));
-            return lines;
-        }
-
-    }
-    public class VoussoirCreate : GH_Component
-    {
-        public VoussoirCreate()
-            : base("Springer - Wall", "SprW",
-                  "Creates a massive Springer with a flat top",
-                  "Voussoir", "Springer") 
+        public VoussoirCreate1()
+            : base("Springer - Trapezoid", "SprT",
+                  "Create a simple trapezoid Springer",
+                  "Voussoir", "Springer")
         { }
 
-        public override Guid ComponentGuid => new Guid("EC88F9F2-CD3B-4C41-ADFF-FD189794137C");
+        public override Guid ComponentGuid => new Guid("FC88F9F2-CD3B-4C41-ADFF-FD189794137C");
 
-        protected override System.Drawing.Bitmap Icon => VoussoirPlugin03.Properties.Resources.springer;
+        protected override System.Drawing.Bitmap Icon => VoussoirPlugin03.Properties.Resources.SpringerT;
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
@@ -445,9 +201,9 @@ namespace VoussoirPlugin03.Components
             //==============================
             // Main loop over springer lines
             //==============================
-            
+
             GH_Structure<GH_Brep> springerVoussoirs = new GH_Structure<GH_Brep>();
-            var ptpt = new GH_Structure<GH_Curve>(); 
+            var ptpt = new GH_Structure<GH_Curve>();
             var lcounter = 0; // just a debug counter to track iterations
 
             var removed0 = new GH_Structure<GH_Brep>();
@@ -519,42 +275,9 @@ namespace VoussoirPlugin03.Components
                 }
 
                 //==============================
-                // Extrude line to create vertical reference surface
-                //==============================
-                var extrusionBrep = Brep.CreateFromSurface(Surface.CreateExtrusion(line, Vector3d.ZAxis * 10));
-
-                //==============================
-                // Intersect this extrusion with all voussoirs
-                //==============================
-                var intersectedVoussoirs = new GH_Structure<GH_Brep>();
-                foreach (var branchIdx in Enumerable.Range(0, remappedVoussoirs.Branches.Count))
-                {
-                    var branch = remappedVoussoirs.Branches[branchIdx];
-                    foreach (var ghBrep in branch)
-                    {
-                        var voussoir = ghBrep.Value;
-                        var points = voussoir.Vertices;
-                        var truepoints = new List<Point3d>();
-
-                        // Keep vertices that are above the current springer plane
-                        foreach (var point in points)
-                        {
-                            if (spPlane.DistanceTo(point.Location) >= 0 || spPlane.DistanceTo(point.Location) >= -0.01)
-                                truepoints.Add(point.Location);
-                        }
-
-                        // If the voussoir intersects (some vertices above the plane), add it to structure
-                        if (truepoints.Count > 0)
-                        {
-                            intersectedVoussoirs.Append(ghBrep, remappedVoussoirs.Paths[branchIdx]);
-                        }
-                    }
-                }
-
-                //==============================
                 // Determine maximum number of voussoirs per branch
                 //==============================
-                int maxCount = intersectedVoussoirs.Branches.Max(b => b.Count);
+                int maxCount = 1;
 
                 // Temporary structure to hold selected voussoirs for this springer
                 GH_Structure<GH_Brep> spVoussoirs = new GH_Structure<GH_Brep>();
@@ -575,7 +298,7 @@ namespace VoussoirPlugin03.Components
                             var sp = brep.Value;
                             springerVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
                             spVoussoirs.Append(new GH_Brep(sp), new GH_Path(i));
-                            removed0.Append(new GH_Brep(sp), new GH_Path(i));                            
+                            removed0.Append(new GH_Brep(sp), new GH_Path(i));
                         }
                     }
 
@@ -673,7 +396,7 @@ namespace VoussoirPlugin03.Components
                         foreach (var v in brep.Vertices)
                         {
                             double z = v.Location.Z;
-                            Debug.WriteLine($"z: " + z);
+                            //Debug.WriteLine($"z: " + z);
                             if (z > maxZ)
                                 maxZ = z;
                         }
@@ -765,33 +488,11 @@ namespace VoussoirPlugin03.Components
                         Point3d pt2 = springerLines[i + j].PointAt(0);
                         spPoints.Add(pt2);
 
-                        //// --- Intrados intersection with vertical extrusion (currently only computed, not used) ---
-                        //Point3d ptB = Point3d.Unset;
-
-                        //for (int a = 0; a < remappedVoussoirs.Branches.Count; a++)
-                        //{
-                        //    var bintrados = intradosTree.Branches[i];
-                        //    foreach (var intrados in bintrados)
-                        //    {
-                        //        Surface srfA = intrados.Value.Surfaces[0];
-                        //        Surface srfB = extrusionBrep.Surfaces[0];
-
-                        //        Curve[] intersectionCurves;
-                        //        Point3d[] intersectionPoints;
-
-                        //        double tol = RhinoDoc.ActiveDoc.ModelAbsoluteTolerance;
-
-                        //        bool success = Intersection.SurfaceSurface(srfA, srfB, tol, out intersectionCurves, out intersectionPoints);
-                        //        // intersectionCurves and intersectionPoints could later define pt3
-                        //    }
-                        //}
-
-                        //// Optional: Intrados * XYPlane intersection placeholder
-
                         // --- Intrados midpoints (used to trace interior profile) ---
+                        Point3d ptA = Point3d.Unset;
                         List<Point3d> ptsA = new List<Point3d>();
                         ptsA = (j == 0) ? intradospoints1.Skip(1).ToList() : intradospoints2.Skip(1).ToList();
-
+                        ptA = ptsA.Last();
 
                         // --- Determine the highest point from extrados vertices ---
                         Point3d pt5 = Point3d.Unset;
@@ -841,10 +542,10 @@ namespace VoussoirPlugin03.Components
                         var sPoints = new List<GH_Point>();
                         sPoints.Add(new GH_Point(pt1));
                         sPoints.Add(new GH_Point(pt2));
-                        sPoints.AddRange(ptsA.Select(p => new GH_Point(p)));
+                        sPoints.Add(new GH_Point(ptA));
                         sPoints.Add(new GH_Point(pt5));
-                        sPoints.Add(new GH_Point(pt6));
-                        sPoints.Add(new GH_Point(pt7));
+                        //sPoints.Add(new GH_Point(pt6));
+                        //sPoints.Add(new GH_Point(pt7));
                         sPoints.Add(new GH_Point(pt1)); // close polyline loop
 
                         //Convert GH_Points to Rhino Points and then to PolylineCurve
@@ -918,5 +619,5 @@ namespace VoussoirPlugin03.Components
             DA.SetDataTree(0, springers);      // 0 → complete springer geometry
             DA.SetDataTree(1, restVoussoirs);  // 1 → remaining voussoirs
         }
-    }  
+    }
 }
