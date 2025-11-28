@@ -16,7 +16,7 @@
   
   <PropertyGroup>
     <!-- Specifies information for Assembly and Yak -->
-    <Version>1.1.0</Version>
+    <Version>1.2.1</Version>
     <Title>Voussoir</Title>
     <Company>STBIM</Company>
     <Description>Voussoir is a Grasshopper plugin for Rhinoceros 3D that enables the generation of stereotomic vault geometries from user-defined inputs.Developed as a tool for digital exploration of stone vault construction, it combines parametric modeling with geometric logic inspired by traditional masonry techniques.</Description>
