@@ -5,7 +5,8 @@ using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
 using VoussoirPlugin03.Properties;
-using Components ; // Ensure this is present to access Vault
+using Components ;
+using Ed.Eto; // Ensure this is present to access Vault
 
 namespace Components
 {
@@ -119,11 +120,11 @@ namespace Components
             pManager.AddNumberParameter("Vault Height", "VaultHeight", "Arc's Height.", GH_ParamAccess.item, 2.0);
             //pManager.AddBooleanParameter("Span Direction", "SpanDirection", "0 = arcs on sides 0-1 and 2-3; 1 = arcs on sides 1-2 and 3-0.", GH_ParamAccess.item, true);
             pManager.AddIntegerParameter("Arc Selection", "VaultProfile",
-                "Right-click to select type of curve\n\nParabola = 0\nArc = 1\nCatenary = 2\n\n... or input one of the above integers", GH_ParamAccess.item, 1);
+                "Right-click to select type of curve\n\nArc = 0\nParabola = 1\nCatenary = 2\n\n... or input one of the above integers", GH_ParamAccess.item, 0);
 
             var param = (Param_Integer)pManager[2];
-            param.AddNamedValue("Parabola", 0);
-            param.AddNamedValue("Arc", 1);
+            param.AddNamedValue("Arc", 0);
+            param.AddNamedValue("Parabola", 1);
             param.AddNamedValue("Catenary", 2);
 
             pManager[1].Optional = true; // Vault Height
@@ -148,14 +149,20 @@ namespace Components
             int mode = 0;
 
             // Retrieve input data from Grasshopper
+            // 1. Try to get data
             if (!DA.GetDataList(0, springerLines))
             {
-                if (springerLines.Count < 2)
-                {
-                    AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "At least 2 Curves needed.");
-                    return;
-                }
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "No curves supplied.");
+                return;   // stop execution here
             }
+
+            // 2. Check list size
+            if (springerLines.Count < 2)
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "At least 2 curves needed.");
+                return;   // stop execution
+            }
+
             DA.GetData(1, ref height);
             //DA.GetData(2, ref spanDir);
             DA.GetData(2, ref mode);
@@ -195,7 +202,7 @@ namespace Components
             var lineIdx = sd == 0 ? new[] { 1, 3 } : new[] { 0, 2 };
 
             // Clamp height for 3-point arc mode so both arcs have the same height and do not exceed the shortest span
-            if (mode == 1)
+            if (mode == 0)
             {
                 double dist0 = edges[arcIdx[0]].A.DistanceTo(edges[arcIdx[0]].B);
                 double dist1 = edges[arcIdx[1]].A.DistanceTo(edges[arcIdx[1]].B);
@@ -253,7 +260,7 @@ namespace Components
 
             switch (mode)
             {
-                case 1:
+                case 0:
                     // Arco 3 pontos
                     {
                         double dist = start.DistanceTo(end);
@@ -268,7 +275,7 @@ namespace Components
                 case 2:
                     // Catenária com extremos a 0 e meio a +h
                     return BuildCatenary(start, end, h, 50);
-                case 0:
+                case 1:
                 default:
                     // Parábola por 3 pontos
                     {

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace VoussoirPlugin03.Components
 {
-    internal class Parabola
+    internal class SprTri
     {
     }
 }
