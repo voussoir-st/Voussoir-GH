@@ -15,12 +15,12 @@ namespace VoussoirPlugin03.Components
     public class SprTri : GH_Component
     {
         public SprTri()
-            : base("Springer - Trapezoid", "SprTri",
-                  "Create a simple trapezoid Springer",
+            : base("Springer - Triangle", "SprTri",
+                  "Create a simple triangle Springer",
                   "Voussoir", "Springer")
         { }
 
-        public override Guid ComponentGuid => new Guid("GC88F9F2-CD3B-4C41-ADFF-FD189794137C");
+        public override Guid ComponentGuid => new Guid("C88F9F2C-D3B4-C41A-DFFD-189794137C00");
 
         protected override System.Drawing.Bitmap Icon => VoussoirPlugin03.Properties.Resources.SprTri;
 

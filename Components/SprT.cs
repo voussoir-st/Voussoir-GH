@@ -36,7 +36,7 @@ namespace VoussoirPlugin03.Components
             pManager.AddCurveParameter("Springer Line", "SpringerLine", "List of base lines to create vault springers", GH_ParamAccess.list);
             pManager.AddBrepParameter("Voussoirs", "Voussoirs", "Voussoirs to analyse", GH_ParamAccess.tree);
             pManager.AddPlaneParameter("Transversal Planes", "TransversalPlanes", "Planes at each span division", GH_ParamAccess.list);
-            pManager.AddNumberParameter("Springer Width", "SpringerWidth", "Distance perpendicular to springer line", GH_ParamAccess.item, 0.3);
+            //pManager.AddNumberParameter("Springer Width", "SpringerWidth", "Distance perpendicular to springer line", GH_ParamAccess.item, 0.3);
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -69,8 +69,8 @@ namespace VoussoirPlugin03.Components
             if (!DA.GetDataList(3, tPlanes)) return;
 
             // Get input 3: width of the springer section (initial default = 0.3 units)
-            double spWidth = 0.3;
-            if (!DA.GetData(4, ref spWidth)) return;
+            double spWidth = 300;
+            //if (!DA.GetData(4, ref spWidth)) return;
 
             //==============================
             // Extract extrados faces from voussoirs
@@ -477,17 +477,62 @@ namespace VoussoirPlugin03.Components
 
                     for (int j = 0; j < 2; j++) // two sides per voussoir row
                     {
-                        //Debug.WriteLine($"\nlinecounter: " + linecounter);
-                        List<Point3d> spPoints = new List<Point3d>();
+                        // --- Compute new pt1 as intersection --- 
+                        List<Point3d> extrados1 = (j == 0) ? extradospoints1 : extradospoints2;
 
-                        // --- Bottom outer point (lower edge of springer) ---
-                        Point3d pt1 = springerLines[i + j].PointAt(1);
-                        spPoints.Add(pt1);
+                        // Find highest & lowest points
+                        Point3d high = Point3d.Unset;
+                        Point3d low = Point3d.Unset;
+                        double maxhi = double.MinValue;
+                        double minhi = double.MaxValue;
+
+                        foreach (var p in extrados1)
+                        {
+                            if (p.Z > maxhi) { maxhi = p.Z; high = p; }
+                            if (p.Z < minhi) { minhi = p.Z; low = p; }
+                        }
+
+                        // Build line (convert to LineCurve)
+                        Line dropLine = new Line(high, low);
+                        Vector3d dir = dropLine.Direction;
+                        dir.Unitize(); // normalize
+
+                        Point3d newStart = dropLine.From - dir * 300.0;
+                        Point3d newEnd = dropLine.To + dir * 300.0;
+
+                        // Rebuild extended line
+                        dropLine = new Line(newStart, newEnd);
+
+                        // Convert to curve
+                        LineCurve dropCurve = new LineCurve(dropLine);
+
+                        // Springer line as LineCurve
+                        Line springerLine = springerLines[i + j];
+                        LineCurve springer = new LineCurve(springerLine);
+
+                        // Intersection
+                        var events = Rhino.Geometry.Intersect.Intersection.CurveCurve(
+                            springer,
+                            dropCurve,
+                            0.001,
+                            0.001
+                        );
+
+                        Point3d pt1;
+
+                        if (events != null && events.Count > 0)
+                        {
+                            pt1 = events[0].PointA;
+                        }
+                        else
+                        {
+                            // fallback
+                            pt1 = springerLine.PointAt(1.0);
+                        }
 
                         // --- Bottom inner point ---
                         Point3d pt2 = springerLines[i + j].PointAt(0);
-                        spPoints.Add(pt2);
-
+                        
                         // --- Intrados midpoints (used to trace interior profile) ---
                         Point3d ptA = Point3d.Unset;
                         List<Point3d> ptsA = new List<Point3d>();
@@ -525,17 +570,6 @@ namespace VoussoirPlugin03.Components
                             pt5 = highest;
                         }
 
-                        // --- Top inner & outer points (raised by maxZ) ---
-                        var pt6x = springerLines[i + j].PointAt(0).X;
-                        var pt6y = springerLines[i + j].PointAt(0).Y;
-                        Point3d pt6 = new Point3d(pt6x, pt6y, maxZ);
-                        spPoints.Add(pt6);
-
-                        var pt7x = springerLines[i + j].PointAt(1).X;
-                        var pt7y = springerLines[i + j].PointAt(1).Y;
-                        Point3d pt7 = new Point3d(pt7x, pt7y, maxZ);
-                        spPoints.Add(pt7);
-
                         //==============================
                         // Build polyline through ordered points
                         //==============================
@@ -544,8 +578,6 @@ namespace VoussoirPlugin03.Components
                         sPoints.Add(new GH_Point(pt2));
                         sPoints.Add(new GH_Point(ptA));
                         sPoints.Add(new GH_Point(pt5));
-                        //sPoints.Add(new GH_Point(pt6));
-                        //sPoints.Add(new GH_Point(pt7));
                         sPoints.Add(new GH_Point(pt1)); // close polyline loop
 
                         //Convert GH_Points to Rhino Points and then to PolylineCurve
