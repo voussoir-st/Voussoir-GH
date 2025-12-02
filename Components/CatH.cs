@@ -49,6 +49,7 @@ namespace Components
             if (!DA.GetData(2, ref height)) return;
 
             Curve catenary = BuildCatenary(start, end, height, 30);
+            Curve a = catenary.Rebuild(20, 3, true);
             DA.SetData(0, catenary);
         }
 

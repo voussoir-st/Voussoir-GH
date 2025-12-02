@@ -1,12 +1,12 @@
-﻿using Grasshopper.Kernel;
+﻿using Components ;
+using Ed.Eto; // Ensure this is present to access Vault
+using Grasshopper.Kernel;
 using Grasshopper.Kernel.Parameters;
 using Rhino;
 using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
 using VoussoirPlugin03.Properties;
-using Components ;
-using Ed.Eto; // Ensure this is present to access Vault
 
 namespace Components
 {
@@ -217,7 +217,8 @@ namespace Components
             {
                 var (A, B) = edges[ei];
                 var c = BuildSpanCurve(A, B, height, mode);
-                if (c != null) arcs.Add(c);
+                Curve d = c.Rebuild(20, 3, true);             
+                if (d != null) arcs.Add(d);
             }
 
             // Build the two horizontal line curves for the vault

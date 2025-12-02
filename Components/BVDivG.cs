@@ -38,8 +38,16 @@ namespace Components
         {
             // Now accepts a tree of surfaces
             pManager.AddSurfaceParameter("Vault Surface", "VaultSurface", "Surface(s) that define the vault. Provide as a tree where each branch corresponds to one vault (1 or multiple surfaces).", GH_ParamAccess.tree);
-            pManager.AddIntegerParameter("Transversal Divisions", "TransversalDivisions", "Number of voussoirs in the vault's span", GH_ParamAccess.item, 12);
-            pManager.AddIntegerParameter("Longitudinal divisions", "LongitudinalDivisions", "Number of voussoirs in the vault's length", GH_ParamAccess.item, 8);
+            pManager.AddIntegerParameter(
+                "Transversal Divisions", "TransversalDivisions",
+                "Number of voussoirs in the vault's span\nMinimum: 3",
+                GH_ParamAccess.tree);
+
+            pManager.AddIntegerParameter(
+                "Longitudinal Divisions", "LongitudinalDivisions",
+                "Number of voussoirs in the vault's length\nMinimum: 1",
+                GH_ParamAccess.tree);
+
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -59,13 +67,28 @@ namespace Components
             var vaultTree = new GH_Structure<GH_Surface>();
             if (!DA.GetDataTree(0, out vaultTree)) return;
 
-            int spanDiv = 12;
-            int lengthDiv = 8;
-            DA.GetData(1, ref spanDiv);
-            DA.GetData(2, ref lengthDiv);
+            // Read span and length divisions as trees
+            GH_Structure<GH_Integer> spanTree;
+            GH_Structure<GH_Integer> lengthTree;
 
-            if (spanDiv < 2) spanDiv = 2;
-            if (lengthDiv < 0) lengthDiv = 0;
+            DA.GetDataTree(1, out spanTree);
+            DA.GetDataTree(2, out lengthTree);
+
+            // Flatten span fallback list
+            List<int> spanFallback = new List<int>();
+            foreach (var p in spanTree.Paths)
+            {
+                foreach (var ghInt in spanTree[p])
+                    spanFallback.Add(ghInt.Value);
+            }
+
+            // Flatten length fallback list
+            List<int> lengthFallback = new List<int>();
+            foreach (var p in lengthTree.Paths)
+            {
+                foreach (var ghInt in lengthTree[p])
+                    lengthFallback.Add(ghInt.Value);
+            }
 
             // Output trees
             var panelPlanesTree = new GH_Structure<GH_Plane>();        // Intrados (per vault -> per cell)
@@ -77,6 +100,41 @@ namespace Components
             // but we'll return trees to keep structure consistent
             foreach (GH_Path branchPath in vaultTree.Paths)
             {
+                // Default values
+                int spanDiv = 12;
+                int lengthDiv = 8;
+
+                // 1) Exact path match (preferred)
+                if (spanTree.PathExists(branchPath) && spanTree[branchPath].Count > 0)
+                    spanDiv = spanTree[branchPath][0].Value;
+
+                // 2) Else try to match by branch index (last index of the path)
+                else
+                {
+                    int branchIndex = (branchPath.Indices.Length > 0) ? branchPath.Indices[branchPath.Indices.Length - 1] : 0;
+                    if (spanFallback.Count > branchIndex)
+                        spanDiv = spanFallback[branchIndex];
+                    else if (spanFallback.Count > 0)
+                        spanDiv = spanFallback[0]; // broadcast first value
+                }
+
+                // Same for length
+                if (lengthTree.PathExists(branchPath) && lengthTree[branchPath].Count > 0)
+                    lengthDiv = lengthTree[branchPath][0].Value;
+                else
+                {
+                    int branchIndex = (branchPath.Indices.Length > 0) ? branchPath.Indices[branchPath.Indices.Length - 1] : 0;
+                    if (lengthFallback.Count > branchIndex)
+                        lengthDiv = lengthFallback[branchIndex];
+                    else if (lengthFallback.Count > 0)
+                        lengthDiv = lengthFallback[0];
+                }
+
+                // Clamp values
+                if (spanDiv < 3) spanDiv = 3;
+                if (lengthDiv < 1) lengthDiv = 1;
+
+
                 // collect surfaces in this branch
                 List<Surface> surfaces = new List<Surface>();
 
