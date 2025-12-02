@@ -287,7 +287,7 @@ namespace VoussoirPlugin03.Components
         {
             pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
             pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddPointParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
+            pManager.AddCurveParameter("Top Wall Line", "WL", "Lines to build walls on the springers", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -452,6 +452,9 @@ namespace VoussoirPlugin03.Components
 
             var removed0 = new GH_Structure<GH_Brep>();
             var removed1 = new GH_Structure<GH_Brep>();
+
+            var wallLinesPoints1 = new List<Point3d>();
+            var wallLinesPoints2 = new List<Point3d>();
 
             // Loop through each springer line
             for (int ispringer = 0; ispringer < spLines.Count; ispringer++)
@@ -673,7 +676,7 @@ namespace VoussoirPlugin03.Components
                         foreach (var v in brep.Vertices)
                         {
                             double z = v.Location.Z;
-                            Debug.WriteLine($"z: " + z);
+                            //Debug.WriteLine($"z: " + z);
                             if (z > maxZ)
                                 maxZ = z;
                         }
@@ -829,6 +832,14 @@ namespace VoussoirPlugin03.Components
                         var pt6y = springerLines[i + j].PointAt(0).Y;
                         Point3d pt6 = new Point3d(pt6x, pt6y, maxZ);
                         spPoints.Add(pt6);
+                        if (ispringer == 0)
+                        {
+                            wallLinesPoints1.Add(pt6);
+                        }
+                        else
+                        {
+                            wallLinesPoints2.Add(pt6);
+                        }
 
                         var pt7x = springerLines[i + j].PointAt(1).X;
                         var pt7y = springerLines[i + j].PointAt(1).Y;
@@ -885,6 +896,23 @@ namespace VoussoirPlugin03.Components
                 }
                 lcounter++;
             }
+            var pta = wallLinesPoints1.First();
+            var ptb = wallLinesPoints1.Last();
+            var ptc = wallLinesPoints2.First();
+            var ptd = wallLinesPoints2.Last();
+
+            var topLines = new List<Line>();
+
+            Line l1 = new Line(pta, ptb);
+            if (l1.From.DistanceTo(spLines[0].PointAtStart) > l1.From.DistanceTo(spLines[0].PointAtEnd))
+                l1.Flip();
+            topLines.Add(l1);
+
+            Line l2 = new Line(ptc, ptd);
+            if (l2.From.DistanceTo(spLines[1].PointAtStart) > l2.From.DistanceTo(spLines[1].PointAtEnd))
+                l2.Flip();
+            topLines.Add(l2);
+
 
             //==============================
             // Separate the remaining voussoirs (not part of springers)
@@ -917,6 +945,7 @@ namespace VoussoirPlugin03.Components
             //==============================
             DA.SetDataTree(0, springers);      // 0 → complete springer geometry
             DA.SetDataTree(1, restVoussoirs);  // 1 → remaining voussoirs
+            DA.SetDataList(2, topLines);
         }
     }  
 }

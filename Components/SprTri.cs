@@ -402,6 +402,127 @@ namespace VoussoirPlugin03.Components
                 //==============================
                 // Loop through each voussoir branch (per springer)
                 //==============================
+
+                var auxLinePoints = new List<Point3d>();
+                for (int i = 0; i < remappedVoussoirs.Branches.Count; i++)
+                {
+                    // --- Collect intrados face vertices ---
+                    var branchintrados = intradosTree.Branches[i];
+                    var intradospoints1 = new List<Point3d>();
+                    var intradospoints2 = new List<Point3d>();
+
+                    foreach (var ghBrep in branchintrados)
+                    {
+                        var brep = ghBrep.Value;
+                        var pointsA = new List<Point3d>();
+                        var pointsB = new List<Point3d>();
+                        //Debug.WriteLine($"brep vert: " + brep.Vertices.Count);
+
+                        // Split vertices into two groups depending on which side of the tPlane they are
+                        foreach (var v in brep.Vertices)
+                        {
+                            if (Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)) < 1e-3)
+                            {
+                                // Vertex lies directly on the plane
+                                pointsA.Add(v.Location);
+                                //Debug.WriteLine($"z: " + Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)));
+                            }
+                            else
+                                pointsB.Add(v.Location);
+                        }
+
+                        // Sort both lists by Z to keep geometry consistent vertically
+                        pointsA = pointsA.OrderBy(pt => pt.Z).ToList();
+                        pointsB = pointsB.OrderBy(pt => pt.Z).ToList();
+
+                        // Accumulate for later polyline construction
+                        intradospoints1.AddRange(pointsA);
+                        intradospoints2.AddRange(pointsB);
+                    }
+
+                    // --- Collect extrados face vertices ---
+                    var branchextrados = extradosTree.Branches[i];
+                    var extradospoints1 = new List<Point3d>();
+                    var extradospoints2 = new List<Point3d>();
+
+                    foreach (var ghBrep in branchextrados)
+                    {
+                        var brep = ghBrep.Value;
+                        var pointsA = new List<Point3d>();
+                        var pointsB = new List<Point3d>();
+
+                        foreach (var v in brep.Vertices)
+                        {
+                            if (Math.Abs(tPlanes[i].Value.DistanceTo(v.Location)) < 0.001)
+                                pointsA.Add(v.Location);
+                            else
+                                pointsB.Add(v.Location);
+                        }
+                        //Debug.WriteLine($"pointsA: " + pointsA.Count);
+                        extradospoints1.AddRange(pointsA);
+                        extradospoints2.AddRange(pointsB);
+                    }
+
+                    for (int j = 0; j < 2; j++) // two sides per voussoir row
+                    {
+                        // --- Compute new pt1 as intersection --- 
+                        List<Point3d> extrados1 = (j == 0) ? extradospoints1 : extradospoints2;
+
+                        // Find highest & lowest points
+                        Point3d high = Point3d.Unset;
+                        Point3d low = Point3d.Unset;
+                        double maxhi = double.MinValue;
+                        double minhi = double.MaxValue;
+
+                        foreach (var p in extrados1)
+                        {
+                            if (p.Z > maxhi) { maxhi = p.Z; high = p; }
+                            if (p.Z < minhi) { minhi = p.Z; low = p; }
+                        }
+
+                        // Build line (convert to LineCurve)
+                        Line dropLine = new Line(high, low);
+                        Vector3d dir = dropLine.Direction;
+                        dir.Unitize(); // normalize
+
+                        Point3d newStart = dropLine.From - dir * 300.0;
+                        Point3d newEnd = dropLine.To + dir * 300.0;
+
+                        // Rebuild extended line
+                        dropLine = new Line(newStart, newEnd);
+
+                        // Convert to curve
+                        LineCurve dropCurve = new LineCurve(dropLine);
+
+                        // Springer line as LineCurve
+                        Line springerLine = springerLines[i + j];
+                        LineCurve springer = new LineCurve(springerLine);
+
+                        // Intersection
+                        var events = Rhino.Geometry.Intersect.Intersection.CurveCurve(
+                            springer,
+                            dropCurve,
+                            0.001,
+                            0.001
+                        );
+
+                        Point3d pt1;
+                        if (events != null && events.Count > 0)
+                        {
+                            pt1 = events[0].PointA;
+                        }
+                        else
+                        {
+                            // fallback
+                            pt1 = springerLine.PointAt(1.0);
+                        }
+                        auxLinePoints.Add(pt1);
+                    }
+                }
+                var ptf = auxLinePoints.First();
+                var ptl = auxLinePoints.Last();
+                var auxLine = new Line(ptf, ptl);
+
                 for (int i = 0; i < remappedVoussoirs.Branches.Count; i++)
                 {
                     // --- Collect intrados face vertices ---
@@ -472,33 +593,8 @@ namespace VoussoirPlugin03.Components
                     for (int j = 0; j < 2; j++) // two sides per voussoir row
                     {
                         // --- Compute new pt1 as intersection --- 
-                        List<Point3d> extrados1 = (j == 0) ? extradospoints1 : extradospoints2;
-
-                        // Find highest & lowest points
-                        Point3d high = Point3d.Unset;
-                        Point3d low = Point3d.Unset;
-                        double maxhi = double.MinValue;
-                        double minhi = double.MaxValue;
-
-                        foreach (var p in extrados1)
-                        {
-                            if (p.Z > maxhi) { maxhi = p.Z; high = p; }
-                            if (p.Z < minhi) { minhi = p.Z; low = p; }
-                        }
-
-                        // Build line (convert to LineCurve)
-                        Line dropLine = new Line(high, low);
-                        Vector3d dir = dropLine.Direction;
-                        dir.Unitize(); // normalize
-
-                        Point3d newStart = dropLine.From - dir * 300.0;
-                        Point3d newEnd = dropLine.To + dir * 300.0;
-
-                        // Rebuild extended line
-                        dropLine = new Line(newStart, newEnd);
-
                         // Convert to curve
-                        LineCurve dropCurve = new LineCurve(dropLine);
+                        LineCurve dropCurve = new LineCurve(auxLine);
 
                         // Springer line as LineCurve
                         Line springerLine = springerLines[i + j];
