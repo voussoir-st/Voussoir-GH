@@ -10,6 +10,7 @@ using Rhino.Geometry;
 using Rhino.Geometry.Intersect;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using VoussoirPlugin03.Properties;
 
@@ -80,7 +81,7 @@ namespace Components
 
             foreach (GH_Path path in divPlanes.Paths)
             {
-                //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "debug 00 path:" + path);
+                Debug.WriteLine($"Branch {path}");
                 var branchGoo = divPlanes.get_Branch(path);
                 if (branchGoo == null || branchGoo.Count != 4)
                 {
@@ -402,7 +403,7 @@ namespace Components
             //remappedVoussoirs.Graft(GH_GraftMode.GraftAll);
             //log.Add("bye");
 
-            DA.SetDataTree(0, remappedVoussoirs);
+            DA.SetDataTree(0, voussoirs);
             DA.SetDataTree(2, intradosFaces);
             DA.SetDataTree(1, extradosFaces);
             DA.SetDataTree(3, contactFaces);
