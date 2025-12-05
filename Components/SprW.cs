@@ -305,8 +305,8 @@ namespace VoussoirPlugin03.Components
             if (!DA.GetDataList(1, spLines)) return; // If missing, stop execution
 
             // Get input 1: data tree containing remapped voussoirs (stone blocks as Breps)
-            GH_Structure<GH_Brep> remappedVoussoirs = new GH_Structure<GH_Brep>();
-            if (!DA.GetDataTree(2, out remappedVoussoirs)) return;
+            GH_Structure<GH_Brep> voussoirs = new GH_Structure<GH_Brep>();
+            if (!DA.GetDataTree(2, out voussoirs)) return;
 
             // Get input 2: list of target planes, probably defining horizontal layers or construction levels
             List<GH_Plane> tPlanes = new List<GH_Plane>();
@@ -315,6 +315,28 @@ namespace VoussoirPlugin03.Components
             // Get input 3: width of the springer section (initial default = 0.3 units)
             double spWidth = 0.3;
             if (!DA.GetData(4, ref spWidth)) return;
+
+            //==============================
+            // Remap voussoirs tree: {A;B} -> {B}(A)
+            //==============================
+            var remappedVoussoirs = new GH_Structure<GH_Brep>();
+            for (int branchIdx = 0; branchIdx < voussoirs.Paths.Count; branchIdx++)
+            {
+                var oldPath = voussoirs.Paths[branchIdx];
+                var branch = voussoirs.Branches[branchIdx];
+
+                if (oldPath.Indices.Length >= 2)
+                {
+                    int A = oldPath.Indices[0];
+                    int B = oldPath.Indices[1];
+                    for (int i = 0; i < branch.Count; i++)
+                        remappedVoussoirs.Insert(new GH_Brep(branch[i]), new GH_Path(B), A);
+                }
+                else
+                {
+                    foreach (var b in branch) remappedVoussoirs.Append(new GH_Brep(b), oldPath);
+                }
+            }
 
             //==============================
             // Extract extrados faces from voussoirs

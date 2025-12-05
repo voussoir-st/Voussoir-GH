@@ -81,7 +81,7 @@ namespace Components
 
             foreach (GH_Path path in divPlanes.Paths)
             {
-                Debug.WriteLine($"Branch {path}");
+                //Debug.WriteLine($"Branch {path}");
                 var branchGoo = divPlanes.get_Branch(path);
                 if (branchGoo == null || branchGoo.Count != 4)
                 {
