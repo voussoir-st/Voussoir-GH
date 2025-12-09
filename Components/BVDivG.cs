@@ -460,6 +460,12 @@ namespace Components
             longitudinalPlanesTree.Simplify(GH_SimplificationMode.CollapseAllOverlaps);
             var tplanes = TreeUtils.TrimTreeDepth(transversalPlanesTree);
             var lplanes = TreeUtils.TrimTreeDepth(longitudinalPlanesTree);
+            if (panelPlanesTree.Paths[0].Indices.Length == 2)
+            {
+                tplanes.Flatten();
+                lplanes.Flatten();
+            }
+
             // Set outputs
             DA.SetDataTree(0, panelPlanesTree);
             DA.SetDataTree(1, divisionPlanesTree);

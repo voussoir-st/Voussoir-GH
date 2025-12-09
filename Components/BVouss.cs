@@ -42,7 +42,7 @@ namespace Components
         {
             pManager.AddPlaneParameter("Intrados Planes", "IntradosPlanes", "Intrados planar vault panels", GH_ParamAccess.tree);
             pManager.AddPlaneParameter("Division planes", "DivisionPlanes", "Planes of each Voussoir Contact Surface", GH_ParamAccess.tree);
-            pManager.AddNumberParameter("Voussoir Thickness", "Thickness", "User defined Voussoir Thickness", GH_ParamAccess.item, 0.3);
+            pManager.AddNumberParameter("Voussoir Thickness", "Thickness", "User defined Voussoir Thickness", GH_ParamAccess.tree, 0.3);
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -64,7 +64,7 @@ namespace Components
             //log.Clear();
             GH_Structure<GH_Plane> intradosPlanes;
             GH_Structure<GH_Plane> divPlanes;
-            double thickness = 0.3;
+            GH_Structure<GH_Number> thicknesses;
 
             //log.Add("hello");
 
@@ -72,12 +72,14 @@ namespace Components
 
             if (!DA.GetDataTree(0, out intradosPlanes)) return;
             if (!DA.GetDataTree(1, out divPlanes)) return;
-            if (!DA.GetData(2, ref thickness)) return;
+            if (!DA.GetDataTree(2, out thicknesses)) return;
 
             DataTree<Line> intersectionCurve = new DataTree<Line>();
             DataTree<Point3d> intersectionPoints = new DataTree<Point3d>();
 
             int[,] pairs = new int[,] { { 0, 2 }, { 0, 3 }, { 1, 2 }, { 1, 3 } };
+
+            double thickness = thicknesses[0][0].Value;
 
             foreach (GH_Path path in divPlanes.Paths)
             {
@@ -207,6 +209,16 @@ namespace Components
 
             foreach (GH_Path path in intradosPlanes.Paths)
             {
+                if (path.Indices.Length > 2 && thicknesses.PathCount > 1)
+                {
+                    int n = path.Indices[0];
+                    var tbranch = thicknesses[n];
+
+                    // Example: extract the first value from that branch
+                    if (tbranch.Count > 0)
+                        thickness = tbranch[0].Value;
+                }
+
                 // Get the original intrados plane
                 var branch = intradosPlanes.get_Branch(path);
                 if (branch == null || branch.Count == 0)
@@ -377,31 +389,7 @@ namespace Components
                     // Usually the first Brep is the solid
                     voussoirs.Add(joined[0], path);
                 }
-            }
-
-            //==============================
-            // Remap voussoirs tree: {A;B} -> {B}(A)
-            //==============================
-            var remappedVoussoirs = new GH_Structure<GH_Brep>();
-            for (int branchIdx = 0; branchIdx < voussoirs.Paths.Count; branchIdx++)
-            {
-                var oldPath = voussoirs.Paths[branchIdx];
-                var branch = voussoirs.Branches[branchIdx];
-
-                if (oldPath.Indices.Length >= 2)
-                {
-                    int A = oldPath.Indices[0];
-                    int B = oldPath.Indices[1];
-                    for (int i = 0; i < branch.Count; i++)
-                        remappedVoussoirs.Insert(new GH_Brep(branch[i]), new GH_Path(B), A);
-                }
-                else
-                {
-                    foreach (var b in branch) remappedVoussoirs.Append(new GH_Brep(b), oldPath);
-                }
-            }
-            //remappedVoussoirs.Graft(GH_GraftMode.GraftAll);
-            //log.Add("bye");
+            }     
 
             DA.SetDataTree(0, voussoirs);
             DA.SetDataTree(2, intradosFaces);
