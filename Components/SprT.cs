@@ -100,11 +100,17 @@ namespace VoussoirPlugin03.Components
                 {
                     // Check if this is a multi-vault structure by looking at path depth
                     bool isMultiVault = p.Indices.Length >= 3;
+                    bool isSingleDivision = p.Indices.Length == 1;
 
                     if (isMultiVault)
                     {
                         // Multi-vault case: {vault;A;B} - filter by vault index
                         if (p.Indices[0] != v) continue;
+                    }
+                    if(isSingleDivision)
+                    {
+                        voussoirsFullTree.Flatten();
+                        vousForVault = voussoirsFullTree;
                     }
                     else
                     {
@@ -123,10 +129,6 @@ namespace VoussoirPlugin03.Components
                     // Add the branch using the ORIGINAL path
                     vousForVault.AppendRange(branch, p);
                 }
-
-                //Debug.WriteLine($"Vault {v}: vousForVault branches: " + vousForVault.Branches.Count);
-                //if (vousForVault.Branches.Count > 0)
-                //    Debug.WriteLine($"First branch count: " + vousForVault.Branches[0].Count);
 
                 // --- Remap voussoirs: extract last two indices from original path ---
                 var remappedVoussoirs = new GH_Structure<GH_Brep>();
@@ -156,7 +158,7 @@ namespace VoussoirPlugin03.Components
                         B = 0;
                     }
 
-                    //Debug.WriteLine($"Original path: {oldPath} -> Remapped to: {{B={B}}}(A={A})");
+                    Debug.WriteLine($"Original path: {oldPath} -> Remapped to: {{B={B}}}(A={A})");
 
                     // Insert with remapped structure: {B}(A)
                     for (int i = 0; i < branch.Count; i++)

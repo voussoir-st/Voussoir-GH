@@ -40,15 +40,14 @@ namespace Components
             // Now accepts a tree of surfaces
             pManager.AddSurfaceParameter("Vault Surface", "VaultSurface", "Surface(s) that define the vault. Provide as a tree where each branch corresponds to one vault (1 or multiple surfaces).", GH_ParamAccess.tree);
             pManager.AddIntegerParameter(
-                "Transversal Divisions", "TransversalDivisions",
-                "Number of voussoirs in the vault's span\nMinimum: 3",
-                GH_ParamAccess.tree, 12);
-
-            pManager.AddIntegerParameter(
-                "Longitudinal Divisions", "LongitudinalDivisions",
-                "Number of voussoirs in the vault's length\nMinimum: 1",
+                "Springer Divisions", "SpringerDivisions",
+                "Number of voussoir divisions along the Springer Lines\nMinimum: 1",
                 GH_ParamAccess.tree, 8);
 
+            pManager.AddIntegerParameter(
+                "Profile Divisions", "ProfileDivisions",
+                "Number of voussoir divisions along the Vault's Profile\nMinimum: 3",
+                GH_ParamAccess.tree, 12);          
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -56,10 +55,12 @@ namespace Components
             pManager.AddPlaneParameter("Intrados Planes", "IP", "Intrados planar vault panels (tree matching input branches).", GH_ParamAccess.tree);
             pManager.AddPlaneParameter("Division planes", "DP", "Planes of each Voussoir Contact Surface (tree matching input branches).", GH_ParamAccess.tree);
             pManager.HideParameter(1);
-            pManager.AddPlaneParameter("Transversal planes", "TP", "Planes at each span division (tree matching input branches).", GH_ParamAccess.list);
+            pManager.AddTextParameter("Boundaries", "B", "Voussoir Boundaries (Indexes of Division Planes).", GH_ParamAccess.tree);
             pManager.HideParameter(2);
-            pManager.AddPlaneParameter("Longitudinal planes", "LP", "Planes at each length division (tree matching input branches).", GH_ParamAccess.list);
+            pManager.AddPlaneParameter("Transversal planes", "TP", "Division Planes along Springer.", GH_ParamAccess.list);
             pManager.HideParameter(3);
+            pManager.AddPlaneParameter("Longitudinal planes", "LP", "Division Planes along Profile.", GH_ParamAccess.list);
+            pManager.HideParameter(4);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -72,8 +73,8 @@ namespace Components
             GH_Structure<GH_Integer> spanTree;
             GH_Structure<GH_Integer> lengthTree;
 
-            DA.GetDataTree(1, out spanTree);
-            DA.GetDataTree(2, out lengthTree);
+            DA.GetDataTree(2, out spanTree);
+            DA.GetDataTree(1, out lengthTree);
 
             // Flatten span fallback list
             List<int> spanFallback = new List<int>();
@@ -94,6 +95,7 @@ namespace Components
             // Output trees
             var panelPlanesTree = new GH_Structure<GH_Plane>();        // Intrados (per vault -> per cell)
             var divisionPlanesTree = new GH_Structure<GH_Plane>();     // Each branch {branch; s; l} holds 4 planes per cell
+            var boundaries = new GH_Structure<GH_String>();
             var transversalPlanesTree = new GH_Structure<GH_Plane>(); // Per vault branch -> transversal planes indexed by l
             var longitudinalPlanesTree = new GH_Structure<GH_Plane>(); // Per vault branch -> longitudinal planes indexed by s
 
@@ -439,24 +441,28 @@ namespace Components
                         Plane panelPlane = new Plane(avgPt, fitPlane.XAxis, fitPlane.YAxis);
 
                         // Append to panelPlanesTree under branch path, use {branch; s; l}
+                        GH_Path dPath = new GH_Path(branchPath.Indices);
                         GH_Path panelPath = new GH_Path(branchPath.Indices).AppendElement(s).AppendElement(l);
-                        panelPlanesTree.Append(new GH_Plane(panelPlane), panelPath);
+                        panelPlanesTree.Append(new GH_Plane(panelPlane), dPath);
 
                         // Build the division planes list for this cell (start/end longitudinal & transversal)
                         // Use same branch path {branch; s; l} and append four planes
                         GH_Path divPath = new GH_Path(branchPath.Indices).AppendElement(s).AppendElement(l);
+                        
                         // safety: longitudinalPlanes has spanPointCount elements
-                        divisionPlanesTree.Append(new GH_Plane(longitudinalPlanes[s]), divPath);       // Start longitudinal
-                        divisionPlanesTree.Append(new GH_Plane(longitudinalPlanes[s + 1]), divPath);   // End longitudinal
-                        divisionPlanesTree.Append(new GH_Plane(transversalPlanes[l]), divPath);        // Start transversal
-                        divisionPlanesTree.Append(new GH_Plane(transversalPlanes[l + 1]), divPath);    // End transversal
+                        int count = divisionPlanesTree[branchPath] != null ? divisionPlanesTree[branchPath].Count : 0;
+                        boundaries.Append(new GH_String($"B{{{count};{count + 1};{count + 2};{count + 3}}}"), dPath);
+                        divisionPlanesTree.Append(new GH_Plane(longitudinalPlanes[s]), dPath);       // Start longitudinal
+                        divisionPlanesTree.Append(new GH_Plane(longitudinalPlanes[s + 1]), dPath);   // End longitudinal
+                        divisionPlanesTree.Append(new GH_Plane(transversalPlanes[l]), dPath);        // Start transversal
+                        divisionPlanesTree.Append(new GH_Plane(transversalPlanes[l + 1]), dPath);    // End transversal
                     }
                 }
             } // end foreach branch
 
-            panelPlanesTree.Simplify(GH_SimplificationMode.CollapseAllOverlaps);
-            divisionPlanesTree.Simplify(GH_SimplificationMode.CollapseAllOverlaps);
-            transversalPlanesTree.Simplify(GH_SimplificationMode.CollapseAllOverlaps);
+            panelPlanesTree.Simplify(GH_SimplificationMode.CollapseLeadingOverlaps);
+            divisionPlanesTree.Simplify(GH_SimplificationMode.CollapseLeadingOverlaps);
+            transversalPlanesTree.Simplify(GH_SimplificationMode.CollapseLeadingOverlaps);
             longitudinalPlanesTree.Simplify(GH_SimplificationMode.CollapseAllOverlaps);
             var tplanes = TreeUtils.TrimTreeDepth(transversalPlanesTree);
             var lplanes = TreeUtils.TrimTreeDepth(longitudinalPlanesTree);
@@ -469,8 +475,9 @@ namespace Components
             // Set outputs
             DA.SetDataTree(0, panelPlanesTree);
             DA.SetDataTree(1, divisionPlanesTree);
-            DA.SetDataTree(2, tplanes);
-            DA.SetDataTree(3, lplanes);
+            DA.SetDataTree(2, boundaries);
+            DA.SetDataTree(3, tplanes);
+            DA.SetDataTree(4, lplanes);
         }
     }
 }
