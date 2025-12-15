@@ -1,401 +1,418 @@
-﻿using Components; // Ensure this is present to access Vault
-using Grasshopper;
-using Grasshopper.Kernel;
-using Grasshopper.Kernel.Data;
-using Grasshopper.Kernel.Geometry.Voronoi;
-using Grasshopper.Kernel.Parameters;
-using Grasshopper.Kernel.Types;
-using Rhino;
-using Rhino.Geometry;
-using Rhino.Geometry.Intersect;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using VoussoirPlugin03.Properties;
+﻿//using Components; // Ensure this is present to access Vault
+//using Grasshopper;
+//using Grasshopper.Kernel;
+//using Grasshopper.Kernel.Data;
+//using Grasshopper.Kernel.Geometry.Voronoi;
+//using Grasshopper.Kernel.Parameters;
+//using Grasshopper.Kernel.Types;
+//using Rhino;
+//using Rhino.Geometry;
+//using Rhino.Geometry.Intersect;
+//using System;
+//using System.Collections.Generic;
+//using System.Diagnostics;
+//using System.Linq;
+//using VoussoirPlugin03.Properties;
 
-namespace Components
-{
-    public class VoussoirCreate : GH_Component
-    {
-        public VoussoirCreate()
-         : base(
-               "Create Voussoirs",
-               "BVouss",
-               "Creates Voussoirs based on predefined planes.",
-               "Voussoir",
-               "Core Geometry"
-               )
-        { }
+//namespace Components
+//{
+//    public class VoussoirCreate : GH_Component
+//    {
+//        public VoussoirCreate()
+//         : base(
+//               "Create Voussoirs",
+//               "BVouss",
+//               "Creates Voussoirs based on predefined planes.",
+//               "Voussoir",
+//               "Core Geometry"
+//               )
+//        { }
 
-        public override Guid ComponentGuid => new Guid("EC88D9F2-CD3B-4C41-ADFF-FD189794137C");
+//        public override Guid ComponentGuid => new Guid("EC88D9F2-CD3B-4C41-ADFF-FD189794137C");
 
-        protected override System.Drawing.Bitmap Icon
-        {
-            get
-            {
-                // Directly return the Bitmap resource, no need to use MemoryStream
-                return VoussoirPlugin03.Properties.Resources.cube09;
-            }
-        }
-        protected override void RegisterInputParams(GH_InputParamManager pManager)
-        {
-            pManager.AddPlaneParameter("Intrados Planes", "IntradosPlanes", "Intrados planar vault panels", GH_ParamAccess.tree);
-            pManager.AddPlaneParameter("Division planes", "DivisionPlanes", "Planes of each Voussoir Contact Surface", GH_ParamAccess.tree);
-            pManager.AddNumberParameter("Voussoir Thickness", "Thickness", "User defined Voussoir Thickness", GH_ParamAccess.tree, 0.3);
-        }
+//        protected override System.Drawing.Bitmap Icon
+//        {
+//            get
+//            {
+//                // Directly return the Bitmap resource, no need to use MemoryStream
+//                return VoussoirPlugin03.Properties.Resources.cube09;
+//            }
+//        }
+//        protected override void RegisterInputParams(GH_InputParamManager pManager)
+//        {
+//            pManager.AddPlaneParameter("Intrados Planes", "IntradosPlanes", "Intrados planar vault panels", GH_ParamAccess.tree);
+//            pManager.AddPlaneParameter("Division planes", "DivisionPlanes", "Planes of each Voussoir Contact Surface", GH_ParamAccess.tree);
+//            pManager.AddTextParameter("Boundaries", "Boundaries", "Voussoir Boundaries (Indexes of Division Planes for each voussoir).", GH_ParamAccess.tree);
+//            pManager.AddNumberParameter("Voussoir Thickness", "Thickness", "User defined Voussoir Thickness", GH_ParamAccess.tree, 0.3);
+//        }
 
-        protected override void RegisterOutputParams(GH_OutputParamManager pManager)
-        {
-            pManager.AddBrepParameter("Voussoir", "V", "Voussoir Blocks", GH_ParamAccess.tree);
-            pManager.AddSurfaceParameter("Extrados", "E", "Extrados Surfaces", GH_ParamAccess.tree);
-            pManager.HideParameter(1);
-            pManager.AddSurfaceParameter("Intrados", "I", "Intrados Surfaces", GH_ParamAccess.tree);
-            pManager.HideParameter(2);
-            pManager.AddBrepParameter("Contact Faces", "CF", "Voussoir contact faces", GH_ParamAccess.tree);
-            pManager.HideParameter(3);
-            //pManager.AddCurveParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
-        }
+//        protected override void RegisterOutputParams(GH_OutputParamManager pManager)
+//        {
+//            pManager.AddBrepParameter("Voussoir", "V", "Voussoir Blocks", GH_ParamAccess.tree);
+//            pManager.AddSurfaceParameter("Extrados", "E", "Extrados Surfaces", GH_ParamAccess.tree);
+//            pManager.HideParameter(1);
+//            pManager.AddSurfaceParameter("Intrados", "I", "Intrados Surfaces", GH_ParamAccess.tree);
+//            pManager.HideParameter(2);
+//            pManager.AddBrepParameter("Contact Faces", "CF", "Voussoir contact faces", GH_ParamAccess.tree);
+//            pManager.HideParameter(3);
+//            //pManager.AddCurveParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
+//        }
 
-        protected override void SolveInstance(IGH_DataAccess DA)
-        {
-            
-            //List<string> log = new List<string>();
-            //log.Clear();
-            GH_Structure<GH_Plane> intradosPlanes;
-            GH_Structure<GH_Plane> divPlanes;
-            GH_Structure<GH_Number> thicknesses;
+//        protected override void SolveInstance(IGH_DataAccess DA)
+//        {
 
-            //log.Add("hello");
+//            //List<string> log = new List<string>();
+//            //log.Clear();
+//            GH_Structure<GH_Plane> intradosPlanesTree;
+//            GH_Structure<GH_Plane> divPlanesTree;
+//            GH_Structure<GH_String> divPlanesIndexesTree;
+//            GH_Structure<GH_Number> thicknesses;
 
-            //RhinoApp.WriteLine("SolveInstance called");
+//            //log.Add("hello");
 
-            if (!DA.GetDataTree(0, out intradosPlanes)) return;
-            if (!DA.GetDataTree(1, out divPlanes)) return;
-            if (!DA.GetDataTree(2, out thicknesses)) return;
+//            //RhinoApp.WriteLine("SolveInstance called");
 
-            DataTree<Line> intersectionCurve = new DataTree<Line>();
-            DataTree<Point3d> intersectionPoints = new DataTree<Point3d>();
+//            if (!DA.GetDataTree(0, out intradosPlanesTree)) return;
+//            if (!DA.GetDataTree(1, out divPlanesTree)) return;
+//            if (!DA.GetDataTree(2, out divPlanesIndexesTree)) return;
+//            if (!DA.GetDataTree(3, out thicknesses)) return;
 
-            int[,] pairs = new int[,] { { 0, 2 }, { 0, 3 }, { 1, 2 }, { 1, 3 } };
+//            double thickness = thicknesses[0][0].Value;
 
-            double thickness = thicknesses[0][0].Value;
+//            foreach (GH_Path path in intradosPlanesTree.Paths)
+//            {
+//                DataTree<Line> intersectionCurve = new DataTree<Line>();
+//                DataTree<Point3d> intersectionPoints = new DataTree<Point3d>();
 
-            foreach (GH_Path path in divPlanes.Paths)
-            {
-                //Debug.WriteLine($"Branch {path}");
-                var branchGoo = divPlanes.get_Branch(path);
-                if (branchGoo == null || branchGoo.Count != 4)
-                {
-                    //RhinoApp.WriteLine($"Branch {path} doesn't have 4 elements ({branchGoo?.Count ?? 0} found).");
-                    continue;
-                }
+//                List<Plane> intradosPlanes = intradosPlanesTree.Branches[intradosPlanesTree.Paths.IndexOf(path)].Select(x => x.Value).ToList(); 
+//                List<Plane> divPlanes = divPlanesTree.Branches[divPlanesTree.Paths.IndexOf(path)].Select(x => x.Value).ToList();
+//                List<String> divPlanesIndexes = divPlanesIndexesTree.Branches[divPlanesIndexesTree.Paths.IndexOf(path)].Select(x => x.Value).ToList();
+                                
+//                for (int p = 0; p < intradosPlanes.Count; p++)
+//                {
+//                    Plane intradosPlane = intradosPlanes[p];
+//                    String planeIndexString = divPlanesIndexes[p];
 
-                List<Plane> branchPlanes = branchGoo.Cast<GH_Plane>().Select(p => p.Value).ToList();
+//                    string trimmed = planeIndexString.TrimStart('B').Trim('{', '}');
 
-                Plane intradosPlane = ((GH_Plane)intradosPlanes.get_Branch(path)[0]).Value;
+//                    // 2. Split by semicolon
+//                    string[] parts = trimmed.Split(';');
 
-                HashSet<Line> uniqueLines = new HashSet<Line>();
-                HashSet<Point3d> uniquePoints = new HashSet<Point3d>();
+//                    // 3. Convert to integers
+//                    List<int> planeIndices = new List<int>();
+//                    foreach (string part in parts)
+//                    {
+//                        if (int.TryParse(part, out int index))
+//                        {
+//                            planeIndices.Add(index);
+//                        }
+//                    }
 
-                for (int k = 0; k < pairs.GetLength(0); k++)
-                {
-
-                    //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "debug 01 k:"+k);
-                    //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "debug 02");
-
-                    int a = pairs[k, 0];
-                    int b = pairs[k, 1];
-
-                    Plane planeA = branchPlanes[a];
-                    Plane planeB = branchPlanes[b];
-
-                    //=========================================
-                    // Intersect planes
-                    //=========================================
-
-                    if (Rhino.Geometry.Intersect.Intersection.PlanePlane(planeA, planeB, out Line line))
-                    {
-                        //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "debug 03 8x? k:"+k);
-
-                        if (uniqueLines.Add(line))
-                            intersectionCurve.Add(line, path);
-                        //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "adicionou line. "+path+" k:"+ k );
-
-                        //=========================================
-                        // Intersect line with intrados plane
-                        //=========================================
-
-                        if (Rhino.Geometry.Intersect.Intersection.LinePlane(line, intradosPlane, out double t))
-                        {
-                            Point3d point = line.PointAt(t);
-                            if (uniquePoints.Add(point))
-                                intersectionPoints.Add(point, path);
-                        }
-                    }
-                }
-            }
-
-
-            //=========================================
-            // Intrados
-            //=========================================
-
-            DataTree<Surface> intradosFaces = new DataTree<Surface>();
-
-            foreach (GH_Path path in intersectionPoints.Paths)
-            {
-                var pts = intersectionPoints.Branch(path);
-                if (pts != null && pts.Count == 4)
-                {
-                    // Ensure the points are in the correct order for surface creation
-                    Point3d pt0 = pts[0];
-                    Point3d pt1 = pts[1];
-                    Point3d pt2 = pts[3];
-                    Point3d pt3 = pts[2];
+//                    List<Plane> branchPlanes = new List<Plane>();
                     
-                    // Create a 4-point surface
-                    Surface srf = NurbsSurface.CreateFromCorners(pt0, pt1, pt2, pt3);
-                    if (srf != null)
-                        intradosFaces.Add(srf, path);
-                        
-                }
-            }
+//                    foreach (int index in planeIndices)
+//                    {
+//                        branchPlanes.Add(divPlanes[index]);
+//                    }
 
-            //=========================================
-            // Average Normals
-            //=========================================
+//                    HashSet<Line> uniqueLines = new HashSet<Line>();
+//                    HashSet<Point3d> uniquePoints = new HashSet<Point3d>();
 
-            DataTree<Line> averageNormal = new DataTree<Line>();
+//                    for (int i = 0; i < pairs.GetLength(0); i++)
+//                    {                       
+//                        int a = pairs[k, 0];
+//                        int b = pairs[k, 1];
 
-            foreach (GH_Path path in intersectionCurve.Paths)
-            {
-                var line = intersectionCurve.Branch(path);
-                if (line != null && line.Count == 4)
-                {
-                    //Average start
-                    Point3d avStart = new Point3d(
-                        line.Average(l => l.From.X),
-                        line.Average(l => l.From.Y),
-                        line.Average(l => l.From.Z)
-                    );
+//                        Plane planeA = branchPlanes[a];
+//                        Plane planeB = branchPlanes[b];
 
-                    //Average end
-                    Point3d avEnd = new Point3d(
-                        line.Average(l => l.To.X),
-                        line.Average(l => l.To.Y),
-                        line.Average(l => l.To.Z)
-                    );
+//                        //=========================================
+//                        // Intersect planes
+//                        //=========================================
 
-                    if (avStart.Z < avEnd.Z)
-                    {
-                        Line avLine = new Line(avStart, avEnd);
-                        averageNormal.Add(avLine, path);
-                    } 
+//                        if (Rhino.Geometry.Intersect.Intersection.PlanePlane(planeA, planeB, out Line line))
+//                        {
+//                            //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "debug 03 8x? k:"+k);
 
-                    if (avStart.Z > avEnd.Z)
-                    {
-                        Line avLine = new Line(avEnd, avStart);
-                        averageNormal.Add(avLine, path);
-                    }
-                }
-            }
+//                            if (uniqueLines.Add(line))
+//                                intersectionCurve.Add(line, path);
+//                            //AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "adicionou line. "+path+" k:"+ k );
 
-            //=========================================
-            // Extrados Planes
-            //=========================================
+//                            //=========================================
+//                            // Intersect line with intrados plane
+//                            //=========================================
 
-            DataTree<Surface> extradosFaces = new DataTree<Surface>();
+//                            if (Rhino.Geometry.Intersect.Intersection.LinePlane(line, intradosPlane, out double t))
+//                            {
+//                                Point3d point = line.PointAt(t);
+//                                if (uniquePoints.Add(point))
+//                                    intersectionPoints.Add(point, path);
+//                            }
+//                        }
+//                    }
+//                }
 
-            foreach (GH_Path path in intradosPlanes.Paths)
-            {
-                if (path.Indices.Length > 2 && thicknesses.PathCount > 1)
-                {
-                    int n = path.Indices[0];
-                    var tbranch = thicknesses[n];
 
-                    // Example: extract the first value from that branch
-                    if (tbranch.Count > 0)
-                        thickness = tbranch[0].Value;
-                }
+//                //=========================================
+//                // Intrados
+//                //=========================================
 
-                // Get the original intrados plane
-                var branch = intradosPlanes.get_Branch(path);
-                if (branch == null || branch.Count == 0)
-                    continue;
+//                DataTree<Surface> intradosFaces = new DataTree<Surface>();
 
-                Plane intradosPlane = ((GH_Plane)branch[0]).Value;
+//                foreach (GH_Path path in intersectionPoints.Paths)
+//                {
+//                    var pts = intersectionPoints.Branch(path);
+//                    if (pts != null && pts.Count == 4)
+//                    {
+//                        // Ensure the points are in the correct order for surface creation
+//                        Point3d pt0 = pts[0];
+//                        Point3d pt1 = pts[1];
+//                        Point3d pt2 = pts[3];
+//                        Point3d pt3 = pts[2];
 
-                // Get the corresponding average normal line
-                var normalBranch = averageNormal.Branch(path);
-                if (normalBranch == null || normalBranch.Count == 0)
-                    continue;
+//                        // Create a 4-point surface
+//                        Surface srf = NurbsSurface.CreateFromCorners(pt0, pt1, pt2, pt3);
+//                        if (srf != null)
+//                            intradosFaces.Add(srf, path);
 
-                Line avgNormalLine = normalBranch[0];
-                Vector3d direction = avgNormalLine.Direction;
-                if (!direction.IsValid || direction.IsZero)
-                    continue;
+//                    }
+//                }
 
-                direction.Unitize();
+//                //=========================================
+//                // Average Normals
+//                //=========================================
 
-                // Ensure direction is opposite to intradosPlane.ZAxis
-                if (direction * intradosPlane.ZAxis < 0)
-                {
-                    direction = -direction; // Reverse direction if not opposite
-                }
+//                DataTree<Line> averageNormal = new DataTree<Line>();
 
-                Vector3d moveVec = direction * thickness;
+//                foreach (GH_Path path in intersectionCurve.Paths)
+//                {
+//                    var line = intersectionCurve.Branch(path);
+//                    if (line != null && line.Count == 4)
+//                    {
+//                        //Average start
+//                        Point3d avStart = new Point3d(
+//                            line.Average(l => l.From.X),
+//                            line.Average(l => l.From.Y),
+//                            line.Average(l => l.From.Z)
+//                        );
 
-                // Move the plane origin
-                Point3d newOrigin = intradosPlane.Origin + moveVec;
-                Plane extradosPlane = new Plane(newOrigin, intradosPlane.XAxis, intradosPlane.YAxis);
+//                        //Average end
+//                        Point3d avEnd = new Point3d(
+//                            line.Average(l => l.To.X),
+//                            line.Average(l => l.To.Y),
+//                            line.Average(l => l.To.Z)
+//                        );
 
-                //=========================================
-                // Intersect line with extrados plane
-                //=========================================
+//                        if (avStart.Z < avEnd.Z)
+//                        {
+//                            Line avLine = new Line(avStart, avEnd);
+//                            averageNormal.Add(avLine, path);
+//                        }
 
-                DataTree<Point3d> exIntersectionPoints = new DataTree<Point3d>();
+//                        if (avStart.Z > avEnd.Z)
+//                        {
+//                            Line avLine = new Line(avEnd, avStart);
+//                            averageNormal.Add(avLine, path);
+//                        }
+//                    }
+//                }
 
-                var linesBranch = intersectionCurve.Branch(path);
-                if (linesBranch != null)
-                {
-                    foreach (var line in linesBranch)
-                    {
-                        if (Rhino.Geometry.Intersect.Intersection.LinePlane(line, extradosPlane, out double t))
-                        {
-                            Point3d point = line.PointAt(t);
-                            exIntersectionPoints.Add(point, path);
-                        }
-                    }
-                }
-                //=========================================
-                // Extrados Faces
-                //=========================================
+//                //=========================================
+//                // Extrados Planes
+//                //=========================================
 
-                foreach (GH_Path p in exIntersectionPoints.Paths)
-                {
-                    var pts = exIntersectionPoints.Branch(path);
-                    if (pts != null && pts.Count == 4)
-                    {
-                        // Ensure the points are in the correct order for surface creation
-                        Point3d pt0 = pts[2];
-                        Point3d pt1 = pts[3];
-                        Point3d pt2 = pts[1];
-                        Point3d pt3 = pts[0];
+//                DataTree<Surface> extradosFaces = new DataTree<Surface>();
 
-                        // Create a 4-point surface
-                        Surface srf = NurbsSurface.CreateFromCorners(pt0, pt1, pt2, pt3);
-                        if (srf != null)
-                            extradosFaces.Add(srf, path);
+//                foreach (Plane p in intradosPlanes)
+//                {
+//                    if (path.Indices.Length > 2 && thicknesses.PathCount > 1)
+//                    {
+//                        int n = path.Indices[0];
+//                        var tbranch = thicknesses[n];
 
-                    }
-                }
-            }
+//                        // Example: extract the first value from that branch
+//                        if (tbranch.Count > 0)
+//                            thickness = tbranch[0].Value;
+//                    }
 
-            //=========================================
-            // Contact Faces
-            //=========================================
+//                    // Get the original intrados plane
+//                    var branch = intradosPlanes.get_Branch(path);
+//                    if (branch == null || branch.Count == 0)
+//                        continue;
 
-            DataTree<Brep> contactFaces = new DataTree<Brep>();
+//                    Plane intradosPlane = ((GH_Plane)branch[0]).Value;
 
-            foreach (GH_Path path in intradosFaces.Paths)
-            {
-                Surface intrados = intradosFaces.Branch(path)[0];
-                Brep intradosBrep = intrados.ToBrep();
+//                    // Get the corresponding average normal line
+//                    var normalBranch = averageNormal.Branch(path);
+//                    if (normalBranch == null || normalBranch.Count == 0)
+//                        continue;
 
-                Surface extrados = extradosFaces.Branch(path)[0];
-                Brep extradosBrep = extrados.ToBrep();
+//                    Line avgNormalLine = normalBranch[0];
+//                    Vector3d direction = avgNormalLine.Direction;
+//                    if (!direction.IsValid || direction.IsZero)
+//                        continue;
 
-                // Extrair arestas
-                List<Curve> edgesA = new List<Curve>();
-                List<Curve> edgesB = new List<Curve>();
+//                    direction.Unitize();
 
-                for (int i = 0; i < intradosBrep.Edges.Count; i++)
-                    edgesA.Add(intradosBrep.Edges[i].DuplicateCurve());
+//                    // Ensure direction is opposite to intradosPlane.ZAxis
+//                    if (direction * intradosPlane.ZAxis < 0)
+//                    {
+//                        direction = -direction; // Reverse direction if not opposite
+//                    }
 
-                for (int i = 0; i < extradosBrep.Edges.Count; i++)
-                    edgesB.Add(extradosBrep.Edges[i].DuplicateCurve());
+//                    Vector3d moveVec = direction * thickness;
 
-                // Reverse the list
-                edgesB.Reverse();
+//                    // Move the plane origin
+//                    Point3d newOrigin = intradosPlane.Origin + moveVec;
+//                    Plane extradosPlane = new Plane(newOrigin, intradosPlane.XAxis, intradosPlane.YAxis);
 
-                // Shift the list by one index forward (first element moves to the end)
-                if (edgesB.Count > 1)
-                {
-                    Curve first = edgesB[0];
-                    edgesB.RemoveAt(0);
-                    edgesB.Add(first);
-                }
+//                    //=========================================
+//                    // Intersect line with extrados plane
+//                    //=========================================
 
-                // Supondo que ambas têm o mesmo número de edges
-                int edgeCount = Math.Min(edgesA.Count, edgesB.Count);
+//                    DataTree<Point3d> exIntersectionPoints = new DataTree<Point3d>();
 
-                for (int i = 0; i < edgeCount; i++)
-                {
-                    Curve c1 = edgesA[i];
-                    Curve c2 = edgesB[i];
-                    c2.Reverse();
+//                    var linesBranch = intersectionCurve.Branch(path);
+//                    if (linesBranch != null)
+//                    {
+//                        foreach (var line in linesBranch)
+//                        {
+//                            if (Rhino.Geometry.Intersect.Intersection.LinePlane(line, extradosPlane, out double t))
+//                            {
+//                                Point3d point = line.PointAt(t);
+//                                exIntersectionPoints.Add(point, path);
+//                            }
+//                        }
+//                    }
+//                    //=========================================
+//                    // Extrados Faces
+//                    //=========================================
 
-                    Brep[] loft = Brep.CreateFromLoft(
-                        new List<Curve> { c1, c2 },
-                        Point3d.Unset,
-                        Point3d.Unset,
-                        LoftType.Straight,
-                        false
-                    );
+//                    foreach (GH_Path p in exIntersectionPoints.Paths)
+//                    {
+//                        var pts = exIntersectionPoints.Branch(path);
+//                        if (pts != null && pts.Count == 4)
+//                        {
+//                            // Ensure the points are in the correct order for surface creation
+//                            Point3d pt0 = pts[2];
+//                            Point3d pt1 = pts[3];
+//                            Point3d pt2 = pts[1];
+//                            Point3d pt3 = pts[0];
 
-                    if (loft != null && loft.Length > 0)
-                    {
-                        Brep loftedFace = loft[0];
+//                            // Create a 4-point surface
+//                            Surface srf = NurbsSurface.CreateFromCorners(pt0, pt1, pt2, pt3);
+//                            if (srf != null)
+//                                extradosFaces.Add(srf, path);
 
-                        // Adicionar ao DataTree
-                        contactFaces.Add(loftedFace, path);
-                    }
-                }
-            }
+//                        }
+//                    }
+//                }
 
-            //=========================================
-            // Voussoirs
-            //=========================================
+//                //=========================================
+//                // Contact Faces
+//                //=========================================
 
-            DataTree<Brep> voussoirs = new DataTree<Brep>();
+//                DataTree<Brep> contactFaces = new DataTree<Brep>();
 
-            foreach (GH_Path path in contactFaces.Paths)
-            {
-                Brep contactFace0 = contactFaces.Branch(path)[0];
-                Brep contactFace1 = contactFaces.Branch(path)[1];
-                Brep contactFace2 = contactFaces.Branch(path)[2];
-                Brep contactFace3 = contactFaces.Branch(path)[3];
+//                foreach (GH_Path path in intradosFaces.Paths)
+//                {
+//                    Surface intrados = intradosFaces.Branch(path)[0];
+//                    Brep intradosBrep = intrados.ToBrep();
 
-                List<Brep> contactFaceList = new List<Brep> { contactFace0, contactFace1, contactFace2, contactFace3 };
-                Brep[] jContactFaces = Brep.JoinBreps(contactFaceList, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+//                    Surface extrados = extradosFaces.Branch(path)[0];
+//                    Brep extradosBrep = extrados.ToBrep();
 
-                if (jContactFaces == null) continue;
+//                    // Extrair arestas
+//                    List<Curve> edgesA = new List<Curve>();
+//                    List<Curve> edgesB = new List<Curve>();
 
-                // Get the corresponding intrados and extrados faces
-                Surface intrados = intradosFaces.Branch(path)[0];
-                Surface extrados = extradosFaces.Branch(path)[0];
+//                    for (int i = 0; i < intradosBrep.Edges.Count; i++)
+//                        edgesA.Add(intradosBrep.Edges[i].DuplicateCurve());
 
-                Brep intradosBrep = intrados.ToBrep();
-                Brep extradosBrep = extrados.ToBrep();
+//                    for (int i = 0; i < extradosBrep.Edges.Count; i++)
+//                        edgesB.Add(extradosBrep.Edges[i].DuplicateCurve());
 
-                List<Brep> brepsToJoin = new List<Brep> { intradosBrep, extradosBrep };
-                brepsToJoin.AddRange(jContactFaces);
+//                    // Reverse the list
+//                    edgesB.Reverse();
 
-                Brep[] joined = Brep.JoinBreps(brepsToJoin, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+//                    // Shift the list by one index forward (first element moves to the end)
+//                    if (edgesB.Count > 1)
+//                    {
+//                        Curve first = edgesB[0];
+//                        edgesB.RemoveAt(0);
+//                        edgesB.Add(first);
+//                    }
 
-                if (joined != null && joined.Length > 0)
-                {
-                    // Usually the first Brep is the solid
-                    voussoirs.Add(joined[0], path);
-                }
-            }     
+//                    // Supondo que ambas têm o mesmo número de edges
+//                    int edgeCount = Math.Min(edgesA.Count, edgesB.Count);
 
-            DA.SetDataTree(0, voussoirs);
-            DA.SetDataTree(2, intradosFaces);
-            DA.SetDataTree(1, extradosFaces);
-            DA.SetDataTree(3, contactFaces);
-            //DA.SetDataTree(4, intersectionCurve);
-        }
-    }
-}
+//                    for (int i = 0; i < edgeCount; i++)
+//                    {
+//                        Curve c1 = edgesA[i];
+//                        Curve c2 = edgesB[i];
+//                        c2.Reverse();
+
+//                        Brep[] loft = Brep.CreateFromLoft(
+//                            new List<Curve> { c1, c2 },
+//                            Point3d.Unset,
+//                            Point3d.Unset,
+//                            LoftType.Straight,
+//                            false
+//                        );
+
+//                        if (loft != null && loft.Length > 0)
+//                        {
+//                            Brep loftedFace = loft[0];
+
+//                            // Adicionar ao DataTree
+//                            contactFaces.Add(loftedFace, path);
+//                        }
+//                    }
+//                }
+
+//                //=========================================
+//                // Voussoirs
+//                //=========================================
+
+//                DataTree<Brep> voussoirs = new DataTree<Brep>();
+
+//                foreach (GH_Path path in contactFaces.Paths)
+//                {
+//                    Brep contactFace0 = contactFaces.Branch(path)[0];
+//                    Brep contactFace1 = contactFaces.Branch(path)[1];
+//                    Brep contactFace2 = contactFaces.Branch(path)[2];
+//                    Brep contactFace3 = contactFaces.Branch(path)[3];
+
+//                    List<Brep> contactFaceList = new List<Brep> { contactFace0, contactFace1, contactFace2, contactFace3 };
+//                    Brep[] jContactFaces = Brep.JoinBreps(contactFaceList, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+
+//                    if (jContactFaces == null) continue;
+
+//                    // Get the corresponding intrados and extrados faces
+//                    Surface intrados = intradosFaces.Branch(path)[0];
+//                    Surface extrados = extradosFaces.Branch(path)[0];
+
+//                    Brep intradosBrep = intrados.ToBrep();
+//                    Brep extradosBrep = extrados.ToBrep();
+
+//                    List<Brep> brepsToJoin = new List<Brep> { intradosBrep, extradosBrep };
+//                    brepsToJoin.AddRange(jContactFaces);
+
+//                    Brep[] joined = Brep.JoinBreps(brepsToJoin, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+
+//                    if (joined != null && joined.Length > 0)
+//                    {
+//                        // Usually the first Brep is the solid
+//                        voussoirs.Add(joined[0], path);
+//                    }
+//                }
+//            }
+
+//            DA.SetDataTree(0, voussoirs);
+//            DA.SetDataTree(2, intradosFaces);
+//            DA.SetDataTree(1, extradosFaces);
+//            DA.SetDataTree(3, contactFaces);
+//            //DA.SetDataTree(4, intersectionCurve);
+//        }
+//    }
+//}

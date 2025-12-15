@@ -8,6 +8,7 @@ using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using VoussoirPlugin03.Components;
 using VoussoirPlugin03.Properties;
 
@@ -401,6 +402,16 @@ namespace Components
                         Plane fitPlane;
                         Plane.FitPlaneToPoints(pts, out fitPlane);
 
+                        var edgeLine1 = new Line(a, b);
+                        var edgeLine2 = new Line(b, c);
+                        var edgeLine3 = new Line(c, d);
+                        var edgeLine4 = new Line(d, a);
+
+                        Plane divplane1 = new Plane(edgeLine1.PointAt(0.5), transversalPlanes[l].XAxis, transversalPlanes[l].YAxis);
+                        Plane divplane2 = new Plane(edgeLine2.PointAt(0.5), longitudinalPlanes[s + 1].XAxis, longitudinalPlanes[s + 1].YAxis);
+                        Plane divplane3 = new Plane(edgeLine3.PointAt(0.5), transversalPlanes[l + 1].XAxis, transversalPlanes[l + 1].YAxis);
+                        Plane divplane4 = new Plane(edgeLine4.PointAt(0.5), longitudinalPlanes[s].XAxis, longitudinalPlanes[s].YAxis);
+
                         Point3d avgPt = new Point3d(
                             (a.X + b.X + c.X + d.X) / 4.0,
                             (a.Y + b.Y + c.Y + d.Y) / 4.0,
@@ -452,25 +463,26 @@ namespace Components
                         // safety: longitudinalPlanes has spanPointCount elements
                         int count = divisionPlanesTree[branchPath] != null ? divisionPlanesTree[branchPath].Count : 0;
                         boundaries.Append(new GH_String($"B{{{count};{count + 1};{count + 2};{count + 3}}}"), dPath);
-                        divisionPlanesTree.Append(new GH_Plane(longitudinalPlanes[s]), dPath);       // Start longitudinal
-                        divisionPlanesTree.Append(new GH_Plane(longitudinalPlanes[s + 1]), dPath);   // End longitudinal
-                        divisionPlanesTree.Append(new GH_Plane(transversalPlanes[l]), dPath);        // Start transversal
-                        divisionPlanesTree.Append(new GH_Plane(transversalPlanes[l + 1]), dPath);    // End transversal
+
+                        divisionPlanesTree.Append(new GH_Plane(divplane1), dPath);       // Start longitudinal
+                        divisionPlanesTree.Append(new GH_Plane(divplane2), dPath);   // End longitudinal
+                        divisionPlanesTree.Append(new GH_Plane(divplane3), dPath);        // Start transversal
+                        divisionPlanesTree.Append(new GH_Plane(divplane4), dPath);    // End transversal
                     }
                 }
             } // end foreach branch
 
-            panelPlanesTree.Simplify(GH_SimplificationMode.CollapseLeadingOverlaps);
-            divisionPlanesTree.Simplify(GH_SimplificationMode.CollapseLeadingOverlaps);
-            transversalPlanesTree.Simplify(GH_SimplificationMode.CollapseLeadingOverlaps);
-            longitudinalPlanesTree.Simplify(GH_SimplificationMode.CollapseAllOverlaps);
+            //panelPlanesTree.Simplify(GH_SimplificationMode.CollapseLeadingOverlaps);
+            //divisionPlanesTree.Simplify(GH_SimplificationMode.CollapseLeadingOverlaps);
+            //transversalPlanesTree.Simplify(GH_SimplificationMode.CollapseLeadingOverlaps);
+            //longitudinalPlanesTree.Simplify(GH_SimplificationMode.CollapseAllOverlaps);
             var tplanes = TreeUtils.TrimTreeDepth(transversalPlanesTree);
             var lplanes = TreeUtils.TrimTreeDepth(longitudinalPlanesTree);
-            if (panelPlanesTree.Paths[0].Indices.Length == 2)
-            {
-                tplanes.Flatten();
-                lplanes.Flatten();
-            }
+            //if (vaultTree.DataCount == 1)
+            //{
+            //    tplanes.Flatten();
+            //    lplanes.Flatten();
+            //}
 
             // Set outputs
             DA.SetDataTree(0, panelPlanesTree);

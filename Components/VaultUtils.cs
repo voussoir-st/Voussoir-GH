@@ -29,5 +29,22 @@ namespace Components
                 arcs[1].Reverse();
             }
         }
+        public static Point3d AveragePoint(List<Point3d> pts)
+        {
+            if (pts == null || pts.Count == 0)
+                return Point3d.Unset;
+
+            double x = 0, y = 0, z = 0;
+
+            foreach (var p in pts)
+            {
+                x += p.X;
+                y += p.Y;
+                z += p.Z;
+            }
+
+            double n = pts.Count;
+            return new Point3d(x / n, y / n, z / n);
+        }
     }
 }
