@@ -7,11 +7,45 @@ using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
 using VoussoirPlugin03.Properties;
+using Grasshopper.Kernel.Data;
+using Grasshopper.Kernel.Types;
+using Rhino;
+using Rhino.Geometry;
+using Rhino.Geometry.Intersect;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Security.Cryptography;
+using VoussoirPlugin03.Properties;
 
 namespace Components
 {
     public static class PolylineUtils
     {
+        public static Vector3d GetBrepNormalAtPoint(Brep brep, Point3d pt, double tol)
+        {
+            // Find closest point on the brep
+            ComponentIndex ci;
+            double u, v;
+            Point3d closestPt;
+            Vector3d normal;
+
+            if (!brep.ClosestPoint(pt, out closestPt, out ci, out u, out v, tol, out normal))
+                return Vector3d.Unset;
+
+            // Ensure it's a face
+            if (ci.ComponentIndexType != ComponentIndexType.BrepFace)
+                return Vector3d.Unset;
+
+            BrepFace face = brep.Faces[ci.Index];
+
+            // Get the normal
+            Vector3d faceNormal = face.NormalAt(u, v);
+            faceNormal.Unitize();
+
+            return faceNormal;
+        }
         /// <summary>
         /// Checks if a polyline is concave.
         /// Returns true if concave, false if convex.
@@ -133,10 +167,10 @@ namespace Components
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddSurfaceParameter("Vault Surface", "VS", "The lofted base surface between the two arcs.", GH_ParamAccess.item);
-            pManager.AddCurveParameter("Springer Lines", "SL", "The 2 Horizontal lines (remaining sides).", GH_ParamAccess.list);
+            pManager.AddSurfaceParameter("Vault Surface", "VS", "The lofted base surface between the two arcs.", GH_ParamAccess.tree);
+            pManager.AddCurveParameter("Springer Lines", "SL", "The 2 Horizontal lines (remaining sides).", GH_ParamAccess.tree);
             pManager.HideParameter(1);
-            pManager.AddCurveParameter("Vault Arcs", "VA", "The 2 generated arcs.", GH_ParamAccess.list);
+            pManager.AddCurveParameter("Vault Arcs", "VA", "The 2 generated arcs.", GH_ParamAccess.tree);
             pManager.HideParameter(2);
         }
 
@@ -166,6 +200,10 @@ namespace Components
             DA.GetData(1, ref height);
             //DA.GetData(2, ref spanDir);
             DA.GetData(2, ref mode);
+
+            GH_Path currentPath = this.Params.Input[0].VolatileData.get_Path(DA.Iteration);
+            var linesTree = new GH_Structure<GH_Curve>();
+            var arcsTree = new GH_Structure<GH_Curve>();
 
             Components.Utils.OrientArcs(springerLines);
             bool intersectLines = false;
@@ -249,9 +287,14 @@ namespace Components
             lines.Reverse();
             Components.Utils.OrientArcs(lines);
 
-            // Output the arcs and lines to Grasshopper
-            DA.SetDataList(1, lines); // L: only lines
-            DA.SetDataList(2, arcs); // VA: only arcs
+            foreach (var l in lines)
+                linesTree.Append(new GH_Curve(l), currentPath);
+
+            foreach (var a in arcs)
+                arcsTree.Append(new GH_Curve(a), currentPath);
+
+            DA.SetDataTree(1, linesTree);
+            DA.SetDataTree(2, arcsTree);
         }
 
         private Curve BuildSpanCurve(Point3d start, Point3d end, double h, int mode)

@@ -21,8 +21,8 @@ namespace Components
     {
         public VoussoirCreate2()
          : base(
-               "Create Voussoirs2",
-               "BVouss2",
+               "Create Voussoirs",
+               "BVouss",
                "Creates Voussoirs based on predefined planes.",
                "Voussoir",
                "Core Geometry"

@@ -3,28 +3,32 @@ using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino;
+using Rhino.Display;
 using Rhino.Geometry;
 using Rhino.Geometry.Intersect;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Security.Cryptography;
+using System.Windows.Forms;
+using static Rhino.DocObjects.PhysicallyBasedMaterial;
 
 namespace VoussoirPlugin03.Components
 {
-    public class SprTri : GH_Component
+    public class VoussoirCreate1 : GH_Component
     {
-        public SprTri()
-            : base("Springer - Triangle", "SprTri",
-                  "Create a simple triangle Springer",
+        public VoussoirCreate1()
+            : base("Springer - Trapezoid", "SprT",
+                  "Create a simple trapezoid Springer",
                   "Voussoir", "Springer")
         { }
 
-        public override Guid ComponentGuid => new Guid("C88F9F2C-D3B4-C41A-DFFD-189794137C00");
+        public override Guid ComponentGuid => new Guid("FC88F9F2-CD3B-4C41-ADFF-FD189794137C");
 
-        protected override System.Drawing.Bitmap Icon => VoussoirPlugin03.Properties.Resources.SprTri;
+        protected override System.Drawing.Bitmap Icon => VoussoirPlugin03.Properties.Resources.SpringerT;
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
@@ -48,7 +52,6 @@ namespace VoussoirPlugin03.Components
             //pManager.AddBrepParameter("Springers", "b1", "Finished Springers", GH_ParamAccess.tree);
             //pManager.AddBrepParameter("Springers", "b2", "Finished Springers", GH_ParamAccess.tree);
             //pManager.AddBrepParameter("Springers", "b3", "Finished Springers", GH_ParamAccess.tree);
-            //pManager.AddPlaneParameter("Springers", "pl1", "Finished Springers", GH_ParamAccess.tree);
 
         }
 
@@ -59,10 +62,10 @@ namespace VoussoirPlugin03.Components
             GH_Structure<GH_Brep> voussoirsTree = new GH_Structure<GH_Brep>();
             GH_Structure<GH_Plane> transPlanesTree = new GH_Structure<GH_Plane>();
 
-            if (!DA.GetDataTree(0, out surfacesTree)) ;
-            if (!DA.GetDataTree(1, out springerLinesTree)) ;
-            if (!DA.GetDataTree(2, out voussoirsTree)) ;
-            if (!DA.GetDataTree(3, out transPlanesTree)) ;
+            if (!DA.GetDataTree(0, out surfacesTree));
+            if (!DA.GetDataTree(1, out springerLinesTree));
+            if (!DA.GetDataTree(2, out voussoirsTree));
+            if (!DA.GetDataTree(3, out transPlanesTree));
 
             //Per Vault
             GH_Structure<GH_Brep> outspringers = new GH_Structure<GH_Brep>();
@@ -76,7 +79,6 @@ namespace VoussoirPlugin03.Components
             GH_Structure<GH_Brep> b1 = new GH_Structure<GH_Brep>();
             GH_Structure<GH_Brep> b2 = new GH_Structure<GH_Brep>();
             GH_Structure<GH_Brep> b3 = new GH_Structure<GH_Brep>();
-            GH_Structure<GH_Plane> pl1 = new GH_Structure<GH_Plane>();
 
             foreach (GH_Path path in surfacesTree.Paths)
             {
@@ -114,6 +116,7 @@ namespace VoussoirPlugin03.Components
                     centroids.Average(p => p.Y),
                     centroids.Average(p => p.Z)
                 );
+
                 double line0t, line1t;
                 var splpointAtruth = Intersection.LinePlane(line0, transPlanes[0], out line0t);
                 var splpointA = line0.PointAt(line0t);
@@ -134,7 +137,7 @@ namespace VoussoirPlugin03.Components
                 //log.Append(new GH_Plane(splinePlane0), path);
 
                 var baseplane0 = new Plane(splpointA, splpointC, spllineA.PointAt(0));
-                pl1.Append(new GH_Plane(baseplane0));
+                //pl1.Append(new GH_Plane(baseplane0));
                 var baseplane1 = new Plane(splpointB, splpointD, spllineA.PointAt(1));
 
                 Debug.WriteLine($"transPlanes: {transPlanes.Count}");
@@ -193,7 +196,7 @@ namespace VoussoirPlugin03.Components
                     List<Brep> culledvoussoirs = new List<Brep>(orderedRowVoussoirs);
                     culledvoussoirs.RemoveAt(orderedRowVoussoirs.Count - 1);
                     culledvoussoirs.RemoveAt(0);
-                    outvoussoirs.AppendRange(orderedRowVoussoirs.Select(v => new GH_Brep(v)), path);
+                    outvoussoirs.AppendRange(culledvoussoirs.Select(v => new GH_Brep(v)), path);
 
                     //Intrados - Extrados
                     List<Brep> intrados = new List<Brep>();
@@ -262,9 +265,9 @@ namespace VoussoirPlugin03.Components
                                 var intpointA = Intersection.CurvePlane(springerLines[1], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
 
                                 var transformIntrados = intrados[0];
-                                b1.Append(new GH_Brep(transformIntrados));
+                                //b1.Append(new GH_Brep(transformIntrados));
                                 var transformExtrados = extrados[0];
-                                b2.Append(new GH_Brep(transformExtrados));
+                                //b2.Append(new GH_Brep(transformExtrados));
 
                                 List<Point3d> springerPLinePoints = new List<Point3d>();
 
@@ -330,34 +333,34 @@ namespace VoussoirPlugin03.Components
 
                                 var pt4 = Point3d.Unset;
                                 double t;
-                                var truth = Intersection.LinePlane(dirLine, baseplane0, out t);
+                                var truth = Intersection.LinePlane(dirLine, baseplane0, out t);                             
                                 pt4 = dirLine.PointAt(t);
 
-                                p2.Append(new GH_Point(pt4));
+                                //p2.Append(new GH_Point(lpoint));
 
-                                c1.Append(new GH_Curve(new LineCurve(dirLine)), path);
+                                //c1.Append(new GH_Curve(new LineCurve(dirLine)), path);
                                 //outspringers.Append(new GH_Point(pt4), path);
                                 if (k == 0)
                                 {
                                     springerPolylinePoints1.Add(pt1);
-                                    //springerPolylinePoints1.Add(pt2);
-                                    springerPolylinePoints1.Add(lpoint);
+                                    springerPolylinePoints1.Add(pt2);
+                                    springerPolylinePoints1.Add(pt3);
                                     springerPolylinePoints1.Add(pt4);
                                     springerPolylinePoints1.Add(pt1);
                                 }
                                 else
                                 {
                                     springerPolylinePoints2.Add(pt1);
-                                    //springerPolylinePoints2.Add(pt2);
-                                    springerPolylinePoints2.Add(lpoint);
+                                    springerPolylinePoints2.Add(pt2);
+                                    springerPolylinePoints2.Add(pt3);
                                     springerPolylinePoints2.Add(pt4);
                                     springerPolylinePoints2.Add(pt1);
                                 }
                             }
 
                             // Assume springerPolylinePoints1 and springerPolylinePoints2 are your point lists
-                            Polyline pol1 = new Polyline(springerPolylinePoints1);
-                            Polyline pol2 = new Polyline(springerPolylinePoints2);
+                            Polyline pl1 = new Polyline(springerPolylinePoints1);
+                            Polyline pl2 = new Polyline(springerPolylinePoints2);
                             List<Brep> openSpringer = new List<Brep>();
                             for (int p = 0; p < springerPolylinePoints1.Count - 1; p++)
                             {
@@ -444,7 +447,6 @@ namespace VoussoirPlugin03.Components
                                 List<BrepVertex> extradospoints = extrados[0].Vertices.ToList();
                                 //outspringers.AppendRange(extradospoints.Select(x => new GH_Point(x.Location)), path);
                                 //p1.Append(new GH_Point(pt3));
-
                                 //Pt 4                                
                                 var lpoint = Point3d.Unset;
                                 var lz = double.MaxValue;
@@ -479,24 +481,24 @@ namespace VoussoirPlugin03.Components
                                 if (k == 0)
                                 {
                                     springerPolylinePoints1.Add(pt1);
-                                    //springerPolylinePoints1.Add(pt2);
-                                    springerPolylinePoints1.Add(lpoint);
+                                    springerPolylinePoints1.Add(pt2);
+                                    springerPolylinePoints1.Add(pt3);
                                     springerPolylinePoints1.Add(pt4);
                                     springerPolylinePoints1.Add(pt1);
                                 }
                                 else
                                 {
                                     springerPolylinePoints2.Add(pt1);
-                                    //springerPolylinePoints2.Add(pt2);
-                                    springerPolylinePoints2.Add(lpoint);
+                                    springerPolylinePoints2.Add(pt2);
+                                    springerPolylinePoints2.Add(pt3);
                                     springerPolylinePoints2.Add(pt4);
                                     springerPolylinePoints2.Add(pt1);
                                 }
                             }
 
                             // Assume springerPolylinePoints1 and springerPolylinePoints2 are your point lists
-                            Polyline pol1 = new Polyline(springerPolylinePoints1);
-                            Polyline pol2 = new Polyline(springerPolylinePoints2);
+                            Polyline pl1 = new Polyline(springerPolylinePoints1);
+                            Polyline pl2 = new Polyline(springerPolylinePoints2);
                             List<Brep> openSpringer = new List<Brep>();
                             for (int p = 0; p < springerPolylinePoints1.Count - 1; p++)
                             {
@@ -538,7 +540,7 @@ namespace VoussoirPlugin03.Components
             //DA.SetDataTree(8, b1);
             //DA.SetDataTree(9, b2);
             //DA.SetDataTree(10, b3);
-            //DA.SetDataTree(11, pl1);
+
         }
     }
 }

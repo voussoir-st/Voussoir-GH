@@ -46,5 +46,6 @@ namespace Components
             double n = pts.Count;
             return new Point3d(x / n, y / n, z / n);
         }
+        
     }
 }

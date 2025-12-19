@@ -3,53 +3,292 @@ using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino;
+using Rhino.Display;
 using Rhino.Geometry;
 using Rhino.Geometry.Intersect;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Security.Cryptography;
+using System.Windows.Forms;
+using static Rhino.DocObjects.PhysicallyBasedMaterial;
 
 namespace VoussoirPlugin03.Components
 {
-    public class SprTri : GH_Component
+    public static class TreeUtils
     {
-        public SprTri()
-            : base("Springer - Triangle", "SprTri",
-                  "Create a simple triangle Springer",
-                  "Voussoir", "Springer")
+        /// <summary>
+        /// Partitions each branch of a GH_Structure into sub-branches of a given size.
+        /// Equivalent to the Grasshopper "Partition List" component, applied branch-wise.
+        /// </summary>
+        public static GH_Structure<T> PartitionTree<T>(GH_Structure<T> inputTree, int partitionSize)
+            where T : IGH_Goo
+        {
+            if (partitionSize < 1)
+                throw new ArgumentException("Partition size must be at least 1.", nameof(partitionSize));
+            GH_Structure<T> partitionedTree = new GH_Structure<T>();
+            for (int i = 0; i < inputTree.PathCount; i++)
+            {
+                var path = inputTree.get_Path(i);
+                var branch = inputTree.Branches[i];
+                for (int j = 0; j < branch.Count; j += partitionSize)
+                {
+                    int count = Math.Min(partitionSize, branch.Count - j);
+                    var chunk = branch.GetRange(j, count);
+                    var newPath = path.AppendElement(j / partitionSize);
+                    foreach (var item in chunk)
+                        partitionedTree.Append(item, newPath);
+                }
+            }
+            return partitionedTree;
+        }
+        public static GH_Structure<T> DuplicateBranchElements<T>(GH_Structure<T> inputTree)
+            where T : class, IGH_Goo, new()
+        {
+            GH_Structure<T> duplicatedTree = new GH_Structure<T>();
+
+            for (int i = 0; i < inputTree.PathCount; i++)
+            {
+                var path = inputTree.get_Path(i);
+                var branch = inputTree.Branches[i];
+
+                foreach (var item in branch)
+                {
+                    // Duplicate safely
+                    T dup1 = item.Duplicate() as T;
+                    T dup2 = item.Duplicate() as T;
+
+                    // Only append non-null items
+                    if (dup1 != null) duplicatedTree.Append(dup1, path);
+                    if (dup2 != null) duplicatedTree.Append(dup2, path);
+                }
+            }
+
+            return duplicatedTree;
+        }
+        /// <summary>
+        /// Finds the closest points on curves for a tree of points and a tree of curves.
+        /// Mimics the Grasshopper Curve Closest Point component.
+        /// </summary>
+        public static void CurveClosestPointTree(GH_Structure<GH_Point> pointsTree, GH_Structure<GH_Curve> curvesTree, out GH_Structure<GH_Point> closestPointsTree, out GH_Structure<GH_Number> closestParamsTree,  out GH_Structure<GH_Number> distancesTree)
+        {
+            closestPointsTree = new GH_Structure<GH_Point>();
+            closestParamsTree = new GH_Structure<GH_Number>();
+            distancesTree = new GH_Structure<GH_Number>();
+
+            for (int i = 0; i < pointsTree.PathCount; i++)
+            {
+                var ptPath = pointsTree.get_Path(i);
+                var ptBranch = pointsTree.Branches[i];
+
+                // Use the corresponding curve branch
+                var curveBranch = curvesTree.Branches[i];
+
+                foreach (var ghPt in ptBranch)
+                {
+                    Point3d pt;
+                    ghPt.CastTo(out pt);
+
+                    double minDist = double.MaxValue;
+                    Point3d closestPt = Point3d.Unset;
+                    double closestParam = 0.0;
+
+                    foreach (var ghCrv in curveBranch)
+                    {
+                        Curve crv = ghCrv.Value;
+                        
+                        if (crv == null) continue;
+
+                        double t;
+                        if (crv.ClosestPoint(pt, out t))
+                        {
+                            Point3d p = crv.PointAt(t);
+                            double d = pt.DistanceTo(p);
+                            if (d < minDist)
+                            {
+                                minDist = d;
+                                closestPt = p;
+                                closestParam = t;
+                            }
+                        }
+                    }
+
+                    closestPointsTree.Append(new GH_Point(closestPt), ptPath);
+                    closestParamsTree.Append(new GH_Number(closestParam), ptPath);
+                    distancesTree.Append(new GH_Number(minDist), ptPath);
+                }
+            }
+        }
+        /// <summary>
+        /// Sorts a tree of values according to a tree of numeric keys (branch by branch).
+        /// Mimics the Grasshopper Sort List component.
+        /// </summary>
+        public static GH_Structure<T> SortListTree<T>(GH_Structure<GH_Number> keysTree, GH_Structure<T> valuesTree) where T : IGH_Goo
+        {
+            if (keysTree.PathCount != valuesTree.PathCount)
+                throw new ArgumentException("Trees must have the same number of branches.");
+
+            GH_Structure<T> sortedTree = new GH_Structure<T>();
+
+            for (int i = 0; i < keysTree.PathCount; i++)
+            {
+                var path = keysTree.get_Path(i);
+                var keys = keysTree.Branches[i].Select(x => x.Value).ToList();
+                var values = valuesTree.Branches[i];
+
+                if (keys.Count != values.Count)
+                    throw new ArgumentException($"Branch {i} has mismatched lengths.");
+
+                // Create list of tuples
+                List<(T value, double key)> pairs = new List<(T, double)>();
+                for (int j = 0; j < keys.Count; j++)
+                    pairs.Add((values[j], keys[j]));
+
+                // Sort iteratively
+                pairs.Sort((a, b) => a.key.CompareTo(b.key));
+
+                foreach (var p in pairs)
+                    sortedTree.Append(p.value, path);
+            }
+
+            return sortedTree;
+        }
+        public static GH_Structure<T> TrimTreeDepth<T>(GH_Structure<T> tree) where T : IGH_Goo
+        {
+            var trimmedTree = new GH_Structure<T>();
+
+            foreach (var path in tree.Paths)
+            {
+                var branch = tree.get_Branch(path);
+                GH_Path newPath;
+                //Debug.WriteLine($"branch: " + path);
+                if (path.Length > 1)
+                {
+                    int[] parentIndices = path.Indices.Take(path.Length - 1).ToArray();
+                    newPath = new GH_Path(parentIndices);
+                }
+                else
+                {
+                    newPath = path;
+                }
+                //Debug.WriteLine($"newPath: " + newPath);
+                foreach (T item in branch.Cast<T>())
+                    trimmedTree.Append(item, newPath);
+            }
+
+            return trimmedTree;
+        }
+        public static void SplitTreeAt<T>(GH_Structure<T> inputTree, int splitIndex, out GH_Structure<T> treeA, out GH_Structure<T> treeB) where T : IGH_Goo
+        {
+            treeA = new GH_Structure<T>();
+            treeB = new GH_Structure<T>();
+
+            for (int i = 0; i < inputTree.Branches.Count; i++)
+            {
+                var path = inputTree.Paths[i];
+                var branch = inputTree.Branches[i];
+
+                int count = branch.Count;
+                int split = Math.Max(0, Math.Min(splitIndex, count));
+
+                var listA = branch.Take(split).ToList();
+                var listB = branch.Skip(split).ToList();
+
+                treeA.AppendRange(listA, path);
+                treeB.AppendRange(listB, path);
+            }
+        }
+        public static Brep LoftBySegments(Curve crvA, Curve crvB, double tol = 1e-6)
+        {
+            // 1. Explode both curves into polyline segments
+            var segsA = ExplodeToSegments(crvA);
+            var segsB = ExplodeToSegments(crvB);
+
+            //// Ensure same number of segments
+            //if (segsA.Count != segsB.Count)
+            //    throw new System.Exception("Curves have different segment counts — cannot pair segments.");
+
+            var breps = new List<Brep>();
+
+            // 2. Loft corresponding segments
+            for (int i = 0; i < segsA.Count; i++)
+            {
+                var segA = segsA[i];
+                var segB = segsB[i];
+
+                // Create the loft between the two straight segments
+                var loft = Brep.CreateFromLoft(
+                    new List<Curve> { segA, segB },
+                    Point3d.Unset,
+                    Point3d.Unset,
+                    LoftType.Straight,
+                    false
+                );
+
+                if (loft != null && loft.Any())
+                    breps.Add(loft.First());
+            }
+
+            // 3. Optionally join all segment lofts into one Brep
+            var joined = Brep.JoinBreps(breps, tol);
+            return joined != null && joined.Any() ? joined.First() : null;
+        }
+        public static List<Curve> ExplodeToSegments(Curve crv)
+        {
+            // Try to get polyline representation
+            if (crv.TryGetPolyline(out Polyline pl))
+            {
+                var segs = new List<Curve>();
+                for (int i = 0; i < pl.Count - 1; i++)
+                    segs.Add(new LineCurve(pl[i], pl[i + 1]));
+                return segs;
+            }
+
+            // Otherwise, explode the curve (handles polylines, polycurves, etc.)
+            var exploded = crv.DuplicateSegments()?.ToList();
+            if (exploded != null && exploded.Count > 0)
+                return exploded;
+
+            // Fallback: divide and create linear approximations
+            var pts = crv.DivideEquidistant(10);
+            if (pts == null || pts.Length < 2) return new List<Curve>();
+            var lines = new List<Curve>();
+            for (int i = 0; i < pts.Length - 1; i++)
+                lines.Add(new LineCurve(pts[i], pts[i + 1]));
+            return lines;
+        }
+
+
+    }
+    public class VoussoirCreate : GH_Component
+    {
+        public VoussoirCreate()
+            : base("Springer - Wall", "SprW",
+                  "Creates a massive Springer with a flat top",
+                  "Voussoir", "Springer") 
         { }
 
-        public override Guid ComponentGuid => new Guid("C88F9F2C-D3B4-C41A-DFFD-189794137C00");
+        public override Guid ComponentGuid => new Guid("EC88F9F2-CD3B-4C41-ADFF-FD189794137C");
 
-        protected override System.Drawing.Bitmap Icon => VoussoirPlugin03.Properties.Resources.SprTri;
+        protected override System.Drawing.Bitmap Icon => VoussoirPlugin03.Properties.Resources.springer;
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddBrepParameter("Vault Surface", "VaultSurface", "Surface that defines the vault", GH_ParamAccess.tree);
-            pManager.AddCurveParameter("Springer Line", "SpringerLine", "List of base lines to create vault springers", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("Vault Surface", "VaultSurface", "Surface that defines the vault", GH_ParamAccess.item);
+            pManager.AddCurveParameter("Springer Line", "SpringerLine", "List of base lines to create vault springers", GH_ParamAccess.list);
             pManager.AddBrepParameter("Voussoirs", "Voussoirs", "Voussoirs to analyse", GH_ParamAccess.tree);
-            pManager.AddPlaneParameter("Transversal Planes", "TransversalPlanes", "Planes at each span division", GH_ParamAccess.tree);
-            //pManager.AddNumberParameter("Springer Width", "SpringerWidth", "Distance perpendicular to springer line", GH_ParamAccess.item, 0.3);
+            pManager.AddPlaneParameter("Transversal Planes", "TransversalPlanes", "Planes at each span division", GH_ParamAccess.list);
+            pManager.AddNumberParameter("Springer Width", "SpringerWidth", "Distance perpendicular to springer line", GH_ParamAccess.item, 0.3);
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
             pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
             pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddPointParameter("Log", "p1", "All messages generated during execution", GH_ParamAccess.tree);
-            //pManager.AddPointParameter("Log", "p2", "All messages generated during execution", GH_ParamAccess.tree);
-            //pManager.AddPointParameter("Log", "p3", "All messages generated during execution", GH_ParamAccess.tree);
-            //pManager.AddCurveParameter("Voussoirs", "c1", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddCurveParameter("Voussoirs", "c2", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddCurveParameter("Voussoirs", "c3", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddBrepParameter("Springers", "b1", "Finished Springers", GH_ParamAccess.tree);
-            //pManager.AddBrepParameter("Springers", "b2", "Finished Springers", GH_ParamAccess.tree);
-            //pManager.AddBrepParameter("Springers", "b3", "Finished Springers", GH_ParamAccess.tree);
-            //pManager.AddPlaneParameter("Springers", "pl1", "Finished Springers", GH_ParamAccess.tree);
-
+            pManager.AddCurveParameter("Top Wall Line", "WL", "Lines to build walls on the springers", GH_ParamAccess.list);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -76,7 +315,6 @@ namespace VoussoirPlugin03.Components
             GH_Structure<GH_Brep> b1 = new GH_Structure<GH_Brep>();
             GH_Structure<GH_Brep> b2 = new GH_Structure<GH_Brep>();
             GH_Structure<GH_Brep> b3 = new GH_Structure<GH_Brep>();
-            GH_Structure<GH_Plane> pl1 = new GH_Structure<GH_Plane>();
 
             foreach (GH_Path path in surfacesTree.Paths)
             {
@@ -114,6 +352,7 @@ namespace VoussoirPlugin03.Components
                     centroids.Average(p => p.Y),
                     centroids.Average(p => p.Z)
                 );
+
                 double line0t, line1t;
                 var splpointAtruth = Intersection.LinePlane(line0, transPlanes[0], out line0t);
                 var splpointA = line0.PointAt(line0t);
@@ -134,7 +373,7 @@ namespace VoussoirPlugin03.Components
                 //log.Append(new GH_Plane(splinePlane0), path);
 
                 var baseplane0 = new Plane(splpointA, splpointC, spllineA.PointAt(0));
-                pl1.Append(new GH_Plane(baseplane0));
+                //pl1.Append(new GH_Plane(baseplane0));
                 var baseplane1 = new Plane(splpointB, splpointD, spllineA.PointAt(1));
 
                 Debug.WriteLine($"transPlanes: {transPlanes.Count}");
@@ -193,7 +432,7 @@ namespace VoussoirPlugin03.Components
                     List<Brep> culledvoussoirs = new List<Brep>(orderedRowVoussoirs);
                     culledvoussoirs.RemoveAt(orderedRowVoussoirs.Count - 1);
                     culledvoussoirs.RemoveAt(0);
-                    outvoussoirs.AppendRange(orderedRowVoussoirs.Select(v => new GH_Brep(v)), path);
+                    outvoussoirs.AppendRange(culledvoussoirs.Select(v => new GH_Brep(v)), path);
 
                     //Intrados - Extrados
                     List<Brep> intrados = new List<Brep>();
@@ -262,9 +501,9 @@ namespace VoussoirPlugin03.Components
                                 var intpointA = Intersection.CurvePlane(springerLines[1], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
 
                                 var transformIntrados = intrados[0];
-                                b1.Append(new GH_Brep(transformIntrados));
+                                //b1.Append(new GH_Brep(transformIntrados));
                                 var transformExtrados = extrados[0];
-                                b2.Append(new GH_Brep(transformExtrados));
+                                //b2.Append(new GH_Brep(transformExtrados));
 
                                 List<Point3d> springerPLinePoints = new List<Point3d>();
 
@@ -333,31 +572,31 @@ namespace VoussoirPlugin03.Components
                                 var truth = Intersection.LinePlane(dirLine, baseplane0, out t);
                                 pt4 = dirLine.PointAt(t);
 
-                                p2.Append(new GH_Point(pt4));
+                                //p2.Append(new GH_Point(lpoint));
 
-                                c1.Append(new GH_Curve(new LineCurve(dirLine)), path);
+                                //c1.Append(new GH_Curve(new LineCurve(dirLine)), path);
                                 //outspringers.Append(new GH_Point(pt4), path);
                                 if (k == 0)
                                 {
                                     springerPolylinePoints1.Add(pt1);
-                                    //springerPolylinePoints1.Add(pt2);
-                                    springerPolylinePoints1.Add(lpoint);
+                                    springerPolylinePoints1.Add(pt2);
+                                    springerPolylinePoints1.Add(pt3);
                                     springerPolylinePoints1.Add(pt4);
                                     springerPolylinePoints1.Add(pt1);
                                 }
                                 else
                                 {
                                     springerPolylinePoints2.Add(pt1);
-                                    //springerPolylinePoints2.Add(pt2);
-                                    springerPolylinePoints2.Add(lpoint);
+                                    springerPolylinePoints2.Add(pt2);
+                                    springerPolylinePoints2.Add(pt3);
                                     springerPolylinePoints2.Add(pt4);
                                     springerPolylinePoints2.Add(pt1);
                                 }
                             }
 
                             // Assume springerPolylinePoints1 and springerPolylinePoints2 are your point lists
-                            Polyline pol1 = new Polyline(springerPolylinePoints1);
-                            Polyline pol2 = new Polyline(springerPolylinePoints2);
+                            Polyline pl1 = new Polyline(springerPolylinePoints1);
+                            Polyline pl2 = new Polyline(springerPolylinePoints2);
                             List<Brep> openSpringer = new List<Brep>();
                             for (int p = 0; p < springerPolylinePoints1.Count - 1; p++)
                             {
@@ -444,7 +683,6 @@ namespace VoussoirPlugin03.Components
                                 List<BrepVertex> extradospoints = extrados[0].Vertices.ToList();
                                 //outspringers.AppendRange(extradospoints.Select(x => new GH_Point(x.Location)), path);
                                 //p1.Append(new GH_Point(pt3));
-
                                 //Pt 4                                
                                 var lpoint = Point3d.Unset;
                                 var lz = double.MaxValue;
@@ -479,24 +717,24 @@ namespace VoussoirPlugin03.Components
                                 if (k == 0)
                                 {
                                     springerPolylinePoints1.Add(pt1);
-                                    //springerPolylinePoints1.Add(pt2);
-                                    springerPolylinePoints1.Add(lpoint);
+                                    springerPolylinePoints1.Add(pt2);
+                                    springerPolylinePoints1.Add(pt3);
                                     springerPolylinePoints1.Add(pt4);
                                     springerPolylinePoints1.Add(pt1);
                                 }
                                 else
                                 {
                                     springerPolylinePoints2.Add(pt1);
-                                    //springerPolylinePoints2.Add(pt2);
-                                    springerPolylinePoints2.Add(lpoint);
+                                    springerPolylinePoints2.Add(pt2);
+                                    springerPolylinePoints2.Add(pt3);
                                     springerPolylinePoints2.Add(pt4);
                                     springerPolylinePoints2.Add(pt1);
                                 }
                             }
 
                             // Assume springerPolylinePoints1 and springerPolylinePoints2 are your point lists
-                            Polyline pol1 = new Polyline(springerPolylinePoints1);
-                            Polyline pol2 = new Polyline(springerPolylinePoints2);
+                            Polyline pl1 = new Polyline(springerPolylinePoints1);
+                            Polyline pl2 = new Polyline(springerPolylinePoints2);
                             List<Brep> openSpringer = new List<Brep>();
                             for (int p = 0; p < springerPolylinePoints1.Count - 1; p++)
                             {
@@ -538,7 +776,7 @@ namespace VoussoirPlugin03.Components
             //DA.SetDataTree(8, b1);
             //DA.SetDataTree(9, b2);
             //DA.SetDataTree(10, b3);
-            //DA.SetDataTree(11, pl1);
+
         }
     }
 }
