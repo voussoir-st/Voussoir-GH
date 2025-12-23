@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace VoussoirPlugin03.Components
 {
@@ -39,16 +40,16 @@ namespace VoussoirPlugin03.Components
         {
             pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
             pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddPointParameter("Log", "p1", "All messages generated during execution", GH_ParamAccess.tree);
-            //pManager.AddPointParameter("Log", "p2", "All messages generated during execution", GH_ParamAccess.tree);
-            //pManager.AddPointParameter("Log", "p3", "All messages generated during execution", GH_ParamAccess.tree);
-            //pManager.AddCurveParameter("Voussoirs", "c1", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddCurveParameter("Voussoirs", "c2", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddCurveParameter("Voussoirs", "c3", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddBrepParameter("Springers", "b1", "Finished Springers", GH_ParamAccess.tree);
-            //pManager.AddBrepParameter("Springers", "b2", "Finished Springers", GH_ParamAccess.tree);
-            //pManager.AddBrepParameter("Springers", "b3", "Finished Springers", GH_ParamAccess.tree);
-            //pManager.AddPlaneParameter("Springers", "pl1", "Finished Springers", GH_ParamAccess.tree);
+            pManager.AddPointParameter("Log", "p1", "All messages generated during execution", GH_ParamAccess.tree);
+            pManager.AddPointParameter("Log", "p2", "All messages generated during execution", GH_ParamAccess.tree);
+            pManager.AddPointParameter("Log", "p3", "All messages generated during execution", GH_ParamAccess.tree);
+            pManager.AddCurveParameter("Voussoirs", "c1", "Non transformed voussoirs", GH_ParamAccess.tree);
+            pManager.AddCurveParameter("Voussoirs", "c2", "Non transformed voussoirs", GH_ParamAccess.tree);
+            pManager.AddCurveParameter("Voussoirs", "c3", "Non transformed voussoirs", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("Springers", "b1", "Finished Springers", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("Springers", "b2", "Finished Springers", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("Springers", "b3", "Finished Springers", GH_ParamAccess.tree);
+            pManager.AddPlaneParameter("Springers", "pl1", "Finished Springers", GH_ParamAccess.tree);
 
         }
 
@@ -95,9 +96,7 @@ namespace VoussoirPlugin03.Components
                 List<Brep> voussoirs = voussoirsTree.Branches[voussoirsTree.Paths.IndexOf(path)].Select(x => x.Value).ToList();
                 List<Plane> transPlanes = transPlanesTree.Branches[transPlanesTree.Paths.IndexOf(path)].Select(x => x.Value).ToList();
                 var alignedsurface = PolylineUtils.AlignNormalToWorldZ(surface.Surfaces[0]);
-                var line0 = new Line(springerLines[0].PointAtStart, springerLines[0].PointAtEnd);
-                var line1 = new Line(springerLines[1].PointAtStart, springerLines[1].PointAtEnd);
-
+                var width = 1;
                 // 2️⃣ Compute the centroid of each Brep
                 List<Point3d> centroids = voussoirs
                     .Select(v =>
@@ -114,28 +113,43 @@ namespace VoussoirPlugin03.Components
                     centroids.Average(p => p.Y),
                     centroids.Average(p => p.Z)
                 );
-                double line0t, line1t;
-                var splpointAtruth = Intersection.LinePlane(line0, transPlanes[0], out line0t);
-                var splpointA = line0.PointAt(line0t);
-                var splpointBtruth = Intersection.LinePlane(line1, transPlanes[0], out line1t);
-                var splpointB = line1.PointAt(line1t);
-                var spllineA = new Line(splpointA, splpointB);
-                spllineA.Extend(2, 2);
-                c2.Append(new GH_Curve(new LineCurve(spllineA)));
 
-                double line2t, line3t;
-                var splpointCtruth = Intersection.LinePlane(line0, transPlanes.Last(), out line2t);
-                var splpointC = line0.PointAt(line2t);
-                var splpointDtruth = Intersection.LinePlane(line1, transPlanes.Last(), out line3t);
-                var splpointD = line1.PointAt(line3t);
-                var spllineB = new Line(splpointA, splpointB);
-                spllineB.Extend(2, 2);
+                var line0 = new Line(springerLines[0].PointAtStart, springerLines[0].PointAtEnd);
+                var line1 = new Line(springerLines[1].PointAtStart, springerLines[1].PointAtEnd);
 
-                //log.Append(new GH_Plane(splinePlane0), path);
+                var pl0 = new Plane(line0.From, line0.To, line0.From + Plane.WorldXY.ZAxis * 1);
+                var zdline = new Line(epicenter, line0.PointAt(0.5)).Direction;
+                zdline.Unitize();
+                if (pl0.ZAxis * zdline < 0)
+                    pl0.Flip();
 
-                var baseplane0 = new Plane(splpointA, splpointC, spllineA.PointAt(0));
-                pl1.Append(new GH_Plane(baseplane0));
-                var baseplane1 = new Plane(splpointB, splpointD, spllineA.PointAt(1));
+                var line2 = new Line(line0.From + pl0.ZAxis * width, line0.To + pl0.ZAxis * width);
+                line2.Extend(300, 300);
+
+                var pla1 = new Plane(line1.From, line1.To, line1.From + Plane.WorldXY.ZAxis * 1);
+                var zdline1 = new Line(epicenter, line1.PointAt(0.5)).Direction;
+                zdline1.Unitize();
+                if (pla1.ZAxis * zdline < 0)
+                    pla1.Flip();
+
+                var line3 = new Line(line0.From + pl0.ZAxis * width, line0.To + pl0.ZAxis * width);
+                line3.Extend(300, 300);
+
+                List<Vector3d> intLines = new List<Vector3d>();
+
+                foreach (var p in transPlanes)
+                {
+                    double a, b;
+                    Intersection.LinePlane(line0, p, out a);
+                    var c = line0.PointAt(a);
+                    Intersection.LinePlane(line2, p, out b);
+                    var d = line2.PointAt(b);
+                    var e = new Line(c, d).Direction;
+                    e.Unitize();
+                    intLines.Add(e);
+                }
+                var baseplane0 = new Plane(line0.From, line0.To, line0.From + intLines[0] * 1);
+                var baseplane1 = new Plane(line1.From, line1.To, line1.From + -intLines[0] * 1);
 
                 Debug.WriteLine($"transPlanes: {transPlanes.Count}");
 
@@ -247,7 +261,85 @@ namespace VoussoirPlugin03.Components
                         extrados.Add(faces[1]);
                     }
 
-                    //log.AppendRange(extrados.Select(x => new GH_Brep(x)), path);
+                    List<Point3d> pts40 = new List<Point3d>();
+
+                    for (int j = 0; j < springerLines.Count; j++)
+                    {
+                        if (j == 0)
+                        {
+                            for (int k = 0; k < 2; k++)
+                            {
+                                var plane = transPlanes[i + k];
+                                var transformIntrados = intrados[0];
+                                var transformExtrados = extrados[0];
+                                //Pt 3
+                                var pt3 = transformExtrados.Vertices
+                                        .Select(v => v.Location)
+                                        .OrderBy(p => Math.Abs(plane.DistanceTo(p))) // closeness to plane
+                                        .Take(2)                                     // two closest
+                                        .OrderByDescending(p => p.Z)                 // highest Z
+                                        .First();
+                                p2.Append(new GH_Point(pt3));
+
+                                //Pt 4                                
+                                var lpoint = transformExtrados.Vertices
+                                    .Select(v => v.Location)
+                                    .OrderBy(p => Math.Abs(plane.DistanceTo(p)))
+                                    .Take(2)
+                                    .OrderBy(p => p.Z)
+                                    .First();
+                                p3.Append(new GH_Point(lpoint));
+
+                                var dirLine = new Line(pt3, lpoint);
+                                dirLine.Extend(300, 300);
+                                var intLine = new Line(pt1, intpointA);
+                                intLine.Extend(300, 300);
+
+                                var pt4 = Point3d.Unset;
+                                double t;
+                                var truth = Intersection.LinePlane(dirLine, baseplane0, out t);
+                                pt4 = dirLine.PointAt(t);
+                                pts40.Add(pt4);
+                            }
+                        }
+                        else
+                        {
+                            for (int k = 0; k < 2; k++)
+                            {
+                                var plane = transPlanes[i + k];
+                                var transformIntrados = intrados.Last();
+                                var transformExtrados = extrados.Last();
+                                //Pt 3
+                                var pt3 = transformExtrados.Vertices
+                                        .Select(v => v.Location)
+                                        .OrderBy(p => Math.Abs(plane.DistanceTo(p))) // closeness to plane
+                                        .Take(2)                                     // two closest
+                                        .OrderByDescending(p => p.Z)                 // highest Z
+                                        .First();
+                                p2.Append(new GH_Point(pt3));
+
+                                //Pt 4                                
+                                var lpoint = transformExtrados.Vertices
+                                    .Select(v => v.Location)
+                                    .OrderBy(p => Math.Abs(plane.DistanceTo(p)))
+                                    .Take(2)
+                                    .OrderBy(p => p.Z)
+                                    .First();
+                                p3.Append(new GH_Point(lpoint));
+
+                                var dirLine = new Line(pt3, lpoint);
+                                dirLine.Extend(300, 300);
+                                var intLine = new Line(pt1, intpointA);
+                                intLine.Extend(300, 300);
+
+                                var pt4 = Point3d.Unset;
+                                double t;
+                                var truth = Intersection.LinePlane(dirLine, baseplane0, out t);
+                                pt4 = dirLine.PointAt(t);
+                                pts40.Add(pt4);
+                            }
+                        }
+                    }
 
                     for (int j = 0; j < springerLines.Count; j++)
                     {
@@ -259,6 +351,8 @@ namespace VoussoirPlugin03.Components
 
                             for (int k = 0; k < 2; k++)
                             {
+                                var plane = transPlanes[i + k];
+
                                 var intpointA = Intersection.CurvePlane(springerLines[1], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
 
                                 var transformIntrados = intrados[0];
@@ -271,57 +365,24 @@ namespace VoussoirPlugin03.Components
                                 //Pt 1
                                 var pt1 = Intersection.CurvePlane(springerLines[0], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
                                 //outspringers.Append(new GH_Point(pt1), path);
-
-                                //Pt 2
-                                var pt2 = Point3d.Unset;
-                                var z = double.MinValue;
-                                foreach (var p in transformIntrados.Vertices)
-                                {
-                                    if (-0.1 < transPlanes[i + k].DistanceTo(p.Location) && transPlanes[i + k].DistanceTo(p.Location) < 0.1)
-                                    {
-                                        if (p.Location.Z > z)
-                                        {
-                                            pt2 = p.Location;
-                                            z = p.Location.Z;
-                                        }
-                                    }
-                                }
-                                //outspringers.Append(new GH_Point(pt2), path);
-
+                                p1.Append(new GH_Point(pt1));
                                 //Pt 3
-                                var pt3 = Point3d.Unset;
-                                var ez = double.MinValue;
-                                foreach (var p in transformExtrados.Vertices)
-                                {
-                                    if (-0.01 < transPlanes[i + k].DistanceTo(p.Location) && transPlanes[i + k].DistanceTo(p.Location) < 0.01)
-                                    {
-                                        if (p.Location.Z > ez)
-                                        {
-                                            pt3 = p.Location;
-                                            ez = p.Location.Z;
-                                        }
-                                    }
-                                }
-                                //outspringers.Append(new GH_Point(pt3), path);
-                                List<BrepVertex> extradospoints = extrados[0].Vertices.ToList();
-                                //outspringers.AppendRange(extradospoints.Select(x => new GH_Point(x.Location)), path);
-                                //p1.Append(new GH_Point(pt3));
-                                //Pt 4                                
-                                var lpoint = Point3d.Unset;
-                                var lz = double.MaxValue;
+                                var pt3 = transformExtrados.Vertices
+                                    .Select(v => v.Location)
+                                    .OrderBy(p => Math.Abs(plane.DistanceTo(p))) // closeness to plane
+                                    .Take(2)                                     // two closest
+                                    .OrderByDescending(p => p.Z)                 // highest Z
+                                    .First();
+                                p2.Append(new GH_Point(pt3));
 
-                                foreach (var p in transformExtrados.Vertices)
-                                {
-                                    //p3.Append(new GH_Point(p.Location));
-                                    if (-0.1 < transPlanes[i + k].DistanceTo(p.Location) && transPlanes[i + k].DistanceTo(p.Location) < 0.1)
-                                    {
-                                        if (p.Location.Z < lz)
-                                        {
-                                            lpoint = p.Location;
-                                            lz = p.Location.Z;
-                                        }
-                                    }
-                                }
+                                //Pt 4                                
+                                var lpoint = transformExtrados.Vertices
+                                    .Select(v => v.Location)
+                                    .OrderBy(p => Math.Abs(plane.DistanceTo(p)))
+                                    .Take(2)
+                                    .OrderBy(p => p.Z)
+                                    .First();
+                                p3.Append(new GH_Point(lpoint));
 
                                 var dirLine = new Line(pt3, lpoint);
                                 dirLine.Extend(300, 300);
@@ -331,9 +392,7 @@ namespace VoussoirPlugin03.Components
                                 var pt4 = Point3d.Unset;
                                 double t;
                                 var truth = Intersection.LinePlane(dirLine, baseplane0, out t);
-                                pt4 = dirLine.PointAt(t);
-
-                                p2.Append(new GH_Point(pt4));
+                                pt4 = dirLine.PointAt(t);                                                               
 
                                 c1.Append(new GH_Curve(new LineCurve(dirLine)), path);
                                 //outspringers.Append(new GH_Point(pt4), path);
@@ -397,6 +456,8 @@ namespace VoussoirPlugin03.Components
 
                             for (int k = 0; k < 2; k++)
                             {
+                                var plane = transPlanes[i + k];
+
                                 var intpointA = Intersection.CurvePlane(springerLines[0], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
 
                                 var transformIntrados = intrados.Last();
@@ -410,57 +471,21 @@ namespace VoussoirPlugin03.Components
                                 var pt1 = Intersection.CurvePlane(springerLines[1], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
                                 //outspringers.Append(new GH_Point(pt1), path);
 
-                                //Pt 2
-                                var pt2 = Point3d.Unset;
-                                var z = double.MinValue;
-                                foreach (var p in transformIntrados.Vertices)
-                                {
-                                    if (-0.1 < transPlanes[i + k].DistanceTo(p.Location) && transPlanes[i + k].DistanceTo(p.Location) < 0.1)
-                                    {
-                                        if (p.Location.Z > z)
-                                        {
-                                            pt2 = p.Location;
-                                            z = p.Location.Z;
-                                        }
-                                    }
-                                }
-                                //outspringers.Append(new GH_Point(pt2), path);
-
                                 //Pt 3
-                                var pt3 = Point3d.Unset;
-                                var ez = double.MinValue;
-                                foreach (var p in transformExtrados.Vertices)
-                                {
-                                    if (-0.01 < transPlanes[i + k].DistanceTo(p.Location) && transPlanes[i + k].DistanceTo(p.Location) < 0.01)
-                                    {
-                                        if (p.Location.Z > ez)
-                                        {
-                                            pt3 = p.Location;
-                                            ez = p.Location.Z;
-                                        }
-                                    }
-                                }
-                                //outspringers.Append(new GH_Point(pt3), path);
-                                List<BrepVertex> extradospoints = extrados[0].Vertices.ToList();
-                                //outspringers.AppendRange(extradospoints.Select(x => new GH_Point(x.Location)), path);
-                                //p1.Append(new GH_Point(pt3));
+                                var pt3 = transformExtrados.Vertices
+                                    .Select(v => v.Location)
+                                    .OrderBy(p => Math.Abs(plane.DistanceTo(p))) // closeness to plane
+                                    .Take(2)                                     // two closest
+                                    .OrderByDescending(p => p.Z)                 // highest Z
+                                    .First();
 
                                 //Pt 4                                
-                                var lpoint = Point3d.Unset;
-                                var lz = double.MaxValue;
-
-                                foreach (var p in transformExtrados.Vertices)
-                                {
-                                    //p3.Append(new GH_Point(p.Location));
-                                    if (-0.1 < transPlanes[i + k].DistanceTo(p.Location) && transPlanes[i + k].DistanceTo(p.Location) < 0.1)
-                                    {
-                                        if (p.Location.Z < lz)
-                                        {
-                                            lpoint = p.Location;
-                                            lz = p.Location.Z;
-                                        }
-                                    }
-                                }
+                                var lpoint = transformExtrados.Vertices
+                                    .Select(v => v.Location)
+                                    .OrderBy(p => Math.Abs(plane.DistanceTo(p)))
+                                    .Take(2)
+                                    .OrderBy(p => p.Z)
+                                    .First();
 
                                 var dirLine = new Line(pt3, lpoint);
                                 dirLine.Extend(300, 300);
