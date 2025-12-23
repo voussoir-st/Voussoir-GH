@@ -1,5 +1,5 @@
 # Voussoir
-![Version](https://img.shields.io/badge/version-1.2.2-brightgreen)
+![Version](https://img.shields.io/badge/version-1.3.0-rc-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 Voussoir is a Grasshopper plugin for Rhino that generates stereotomic vault geometries from user-defined inputs.

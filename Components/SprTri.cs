@@ -40,16 +40,16 @@ namespace VoussoirPlugin03.Components
         {
             pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
             pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
-            pManager.AddPointParameter("Log", "p1", "All messages generated during execution", GH_ParamAccess.tree);
-            pManager.AddPointParameter("Log", "p2", "All messages generated during execution", GH_ParamAccess.tree);
-            pManager.AddPointParameter("Log", "p3", "All messages generated during execution", GH_ParamAccess.tree);
-            pManager.AddCurveParameter("Voussoirs", "c1", "Non transformed voussoirs", GH_ParamAccess.tree);
-            pManager.AddCurveParameter("Voussoirs", "c2", "Non transformed voussoirs", GH_ParamAccess.tree);
-            pManager.AddCurveParameter("Voussoirs", "c3", "Non transformed voussoirs", GH_ParamAccess.tree);
-            pManager.AddBrepParameter("Springers", "b1", "Finished Springers", GH_ParamAccess.tree);
-            pManager.AddBrepParameter("Springers", "b2", "Finished Springers", GH_ParamAccess.tree);
-            pManager.AddBrepParameter("Springers", "b3", "Finished Springers", GH_ParamAccess.tree);
-            pManager.AddPlaneParameter("Springers", "pl1", "Finished Springers", GH_ParamAccess.tree);
+            //pManager.AddPointParameter("Log", "p1", "All messages generated during execution", GH_ParamAccess.tree);
+            //pManager.AddPointParameter("Log", "p2", "All messages generated during execution", GH_ParamAccess.tree);
+            //pManager.AddPointParameter("Log", "p3", "All messages generated during execution", GH_ParamAccess.tree);
+            //pManager.AddCurveParameter("Voussoirs", "c1", "Non transformed voussoirs", GH_ParamAccess.tree);
+            //pManager.AddCurveParameter("Voussoirs", "c2", "Non transformed voussoirs", GH_ParamAccess.tree);
+            //pManager.AddCurveParameter("Voussoirs", "c3", "Non transformed voussoirs", GH_ParamAccess.tree);
+            //pManager.AddBrepParameter("Springers", "b1", "Finished Springers", GH_ParamAccess.tree);
+            //pManager.AddBrepParameter("Springers", "b2", "Finished Springers", GH_ParamAccess.tree);
+            //pManager.AddBrepParameter("Springers", "b3", "Finished Springers", GH_ParamAccess.tree);
+            //pManager.AddPlaneParameter("Springers", "pl1", "Finished Springers", GH_ParamAccess.tree);
 
         }
 
@@ -152,6 +152,10 @@ namespace VoussoirPlugin03.Components
                 var baseplane1 = new Plane(line1.From, line1.To, line1.From + -intLines[0] * 1);
 
                 Debug.WriteLine($"transPlanes: {transPlanes.Count}");
+                List<Point3d> pts40 = new List<Point3d>();
+                List<Point3d> pts41 = new List<Point3d>();
+                List<Brep> intrados = new List<Brep>();
+                List<Brep> extrados = new List<Brep>();
 
                 //Per Row
                 for (int i = 0; i < transPlanes.Count - 1; i++)
@@ -210,9 +214,8 @@ namespace VoussoirPlugin03.Components
                     outvoussoirs.AppendRange(orderedRowVoussoirs.Select(v => new GH_Brep(v)), path);
 
                     //Intrados - Extrados
-                    List<Brep> intrados = new List<Brep>();
-                    List<Brep> extrados = new List<Brep>();
-
+                    List<Brep> rowintrados = new List<Brep>();
+                    List<Brep> rowextrados = new List<Brep>();
                     foreach (Brep v in orderedRowVoussoirs)
                     {
                         //outspringers.Append(new GH_Brep(v), path);
@@ -258,10 +261,11 @@ namespace VoussoirPlugin03.Components
                             .ToList();
 
                         intrados.Add(faces[0]);
+                        rowintrados.Add(faces[0]);
                         extrados.Add(faces[1]);
-                    }
+                        rowextrados.Add(faces[1]);
 
-                    List<Point3d> pts40 = new List<Point3d>();
+                    }
 
                     for (int j = 0; j < springerLines.Count; j++)
                     {
@@ -269,9 +273,14 @@ namespace VoussoirPlugin03.Components
                         {
                             for (int k = 0; k < 2; k++)
                             {
+                                //Pt 1
+                                var pt1 = Intersection.CurvePlane(springerLines[0], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
+
+                                var intpointA = Intersection.CurvePlane(springerLines[1], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
+
                                 var plane = transPlanes[i + k];
-                                var transformIntrados = intrados[0];
-                                var transformExtrados = extrados[0];
+                                var transformIntrados = rowintrados[0];
+                                var transformExtrados = rowextrados[0];
                                 //Pt 3
                                 var pt3 = transformExtrados.Vertices
                                         .Select(v => v.Location)
@@ -279,7 +288,7 @@ namespace VoussoirPlugin03.Components
                                         .Take(2)                                     // two closest
                                         .OrderByDescending(p => p.Z)                 // highest Z
                                         .First();
-                                p2.Append(new GH_Point(pt3));
+                                //p2.Append(new GH_Point(pt3));
 
                                 //Pt 4                                
                                 var lpoint = transformExtrados.Vertices
@@ -288,7 +297,7 @@ namespace VoussoirPlugin03.Components
                                     .Take(2)
                                     .OrderBy(p => p.Z)
                                     .First();
-                                p3.Append(new GH_Point(lpoint));
+                                //p3.Append(new GH_Point(lpoint));
 
                                 var dirLine = new Line(pt3, lpoint);
                                 dirLine.Extend(300, 300);
@@ -299,16 +308,23 @@ namespace VoussoirPlugin03.Components
                                 double t;
                                 var truth = Intersection.LinePlane(dirLine, baseplane0, out t);
                                 pt4 = dirLine.PointAt(t);
+                                //p1.Append(new GH_Point(pt4));
                                 pts40.Add(pt4);
                             }
                         }
+
                         else
                         {
                             for (int k = 0; k < 2; k++)
                             {
+                                //Pt 1
+                                var pt1 = Intersection.CurvePlane(springerLines[0], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
+
+                                var intpointA = Intersection.CurvePlane(springerLines[1], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
+
                                 var plane = transPlanes[i + k];
-                                var transformIntrados = intrados.Last();
-                                var transformExtrados = extrados.Last();
+                                var transformIntrados = rowintrados.Last();
+                                var transformExtrados = rowextrados.Last();
                                 //Pt 3
                                 var pt3 = transformExtrados.Vertices
                                         .Select(v => v.Location)
@@ -316,7 +332,7 @@ namespace VoussoirPlugin03.Components
                                         .Take(2)                                     // two closest
                                         .OrderByDescending(p => p.Z)                 // highest Z
                                         .First();
-                                p2.Append(new GH_Point(pt3));
+                                //p2.Append(new GH_Point(pt3));
 
                                 //Pt 4                                
                                 var lpoint = transformExtrados.Vertices
@@ -325,22 +341,74 @@ namespace VoussoirPlugin03.Components
                                     .Take(2)
                                     .OrderBy(p => p.Z)
                                     .First();
-                                p3.Append(new GH_Point(lpoint));
+                                //p3.Append(new GH_Point(lpoint));
 
                                 var dirLine = new Line(pt3, lpoint);
                                 dirLine.Extend(300, 300);
                                 var intLine = new Line(pt1, intpointA);
                                 intLine.Extend(300, 300);
 
+
+
                                 var pt4 = Point3d.Unset;
                                 double t;
-                                var truth = Intersection.LinePlane(dirLine, baseplane0, out t);
+                                var truth = Intersection.LinePlane(dirLine, baseplane1, out t);
                                 pt4 = dirLine.PointAt(t);
-                                pts40.Add(pt4);
+                                pts41.Add(pt4);
                             }
                         }
                     }
+                }
 
+                var Line20 = new Line(pts40[0], pts40.Last());
+                c1.Append(new GH_Curve(new LineCurve(Line20)));
+                var Line21 = new Line(pts41[0], pts41.Last());
+                c1.Append(new GH_Curve(new LineCurve(Line21)));
+
+                for (int i = 0; i < transPlanes.Count - 1; i++)
+                {
+                    var intplaneoriginA = transPlanes[i].Origin;
+                    var intplaneoriginB = transPlanes[i + 1].Origin;
+                    var avgorigin = new Point3d(
+                        (intplaneoriginA.X + intplaneoriginB.X) / 2,
+                        (intplaneoriginA.Y + intplaneoriginB.Y) / 2,
+                        (intplaneoriginA.Z + intplaneoriginB.Z) / 2
+                        );
+
+                    var avgPlane = new Plane(avgorigin, transPlanes[i].XAxis, transPlanes[i].YAxis);
+
+                    var planesTol = intplaneoriginA.DistanceTo(intplaneoriginB) * 0.8;
+
+                    List<Brep> rowIntrados = new List<Brep>();
+                    List<Brep> rowExtrados = new List<Brep>();
+
+                    foreach (Brep v in intrados)
+                    {
+                        Point3d avgintradosPt = new Point3d(
+                            v.Vertices.Average(p => p.Location.X),
+                            v.Vertices.Average(p => p.Location.Y),
+                            v.Vertices.Average(p => p.Location.Z)
+                        );
+
+                        if (-planesTol / 2 < avgPlane.DistanceTo(avgintradosPt) && avgPlane.DistanceTo(avgintradosPt) < planesTol / 2)
+                        {
+                            rowIntrados.Add(v);
+                        }
+                    }
+                    foreach (Brep v in extrados)
+                    {
+                        Point3d avgextradosPt = new Point3d(
+                            v.Vertices.Average(p => p.Location.X),
+                            v.Vertices.Average(p => p.Location.Y),
+                            v.Vertices.Average(p => p.Location.Z)
+                        );
+
+                        if (-planesTol / 2 < avgPlane.DistanceTo(avgextradosPt) && avgPlane.DistanceTo(avgextradosPt) < planesTol / 2)
+                        {
+                            rowExtrados.Add(v);
+                        }
+                    }
+                                        
                     for (int j = 0; j < springerLines.Count; j++)
                     {
 
@@ -352,20 +420,22 @@ namespace VoussoirPlugin03.Components
                             for (int k = 0; k < 2; k++)
                             {
                                 var plane = transPlanes[i + k];
-
+                                pl1.Append(new GH_Plane(plane));
                                 var intpointA = Intersection.CurvePlane(springerLines[1], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
 
-                                var transformIntrados = intrados[0];
-                                b1.Append(new GH_Brep(transformIntrados));
-                                var transformExtrados = extrados[0];
-                                b2.Append(new GH_Brep(transformExtrados));
+                                var transformIntrados = rowIntrados[0];
+                                //b1.Append(new GH_Brep(transformIntrados));
+                                var transformExtrados = rowExtrados[0];
+                                //b2.Append(new GH_Brep(transformExtrados));
 
                                 List<Point3d> springerPLinePoints = new List<Point3d>();
 
                                 //Pt 1
                                 var pt1 = Intersection.CurvePlane(springerLines[0], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
-                                //outspringers.Append(new GH_Point(pt1), path);
                                 p1.Append(new GH_Point(pt1));
+                                //outspringers.Append(new GH_Point(pt1), path);
+                                //p1.Append(new GH_Point(pt1));
+
                                 //Pt 3
                                 var pt3 = transformExtrados.Vertices
                                     .Select(v => v.Location)
@@ -373,7 +443,7 @@ namespace VoussoirPlugin03.Components
                                     .Take(2)                                     // two closest
                                     .OrderByDescending(p => p.Z)                 // highest Z
                                     .First();
-                                p2.Append(new GH_Point(pt3));
+                                //p2.Append(new GH_Point(pt3));
 
                                 //Pt 4                                
                                 var lpoint = transformExtrados.Vertices
@@ -382,19 +452,19 @@ namespace VoussoirPlugin03.Components
                                     .Take(2)
                                     .OrderBy(p => p.Z)
                                     .First();
-                                p3.Append(new GH_Point(lpoint));
-
+                                //p3.Append(new GH_Point(lpoint));
+                                p2.Append(new GH_Point(lpoint));
                                 var dirLine = new Line(pt3, lpoint);
-                                dirLine.Extend(300, 300);
-                                var intLine = new Line(pt1, intpointA);
-                                intLine.Extend(300, 300);
+                                dirLine.Extend(300, 300);                                
 
                                 var pt4 = Point3d.Unset;
                                 double t;
-                                var truth = Intersection.LinePlane(dirLine, baseplane0, out t);
-                                pt4 = dirLine.PointAt(t);                                                               
+                                Intersection.LinePlane(Line20, plane, out t);
+                                pt4 = Line20.PointAt(t);
 
-                                c1.Append(new GH_Curve(new LineCurve(dirLine)), path);
+                                p3.Append(new GH_Point(pt4));
+
+                                //c1.Append(new GH_Curve(new LineCurve(dirLine)), path);
                                 //outspringers.Append(new GH_Point(pt4), path);
                                 if (k == 0)
                                 {
@@ -460,9 +530,9 @@ namespace VoussoirPlugin03.Components
 
                                 var intpointA = Intersection.CurvePlane(springerLines[0], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
 
-                                var transformIntrados = intrados.Last();
+                                var transformIntrados = rowIntrados.Last();
                                 //b1.Append(new GH_Brep(transformIntrados));
-                                var transformExtrados = extrados.Last();
+                                var transformExtrados = rowExtrados.Last();
                                 //b2.Append(new GH_Brep(transformExtrados));
 
                                 List<Point3d> springerPLinePoints = new List<Point3d>();
@@ -494,8 +564,8 @@ namespace VoussoirPlugin03.Components
 
                                 var pt4 = Point3d.Unset;
                                 double t;
-                                var truth = Intersection.LinePlane(dirLine, baseplane1, out t);
-                                pt4 = dirLine.PointAt(t);
+                                Intersection.LinePlane(Line21, plane, out t);
+                                pt4 = Line21.PointAt(t);
 
                                 //p2.Append(new GH_Point(lpoint));
 
