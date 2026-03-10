@@ -1,22 +1,13 @@
-﻿using Components ;
-using Ed.Eto; // Ensure this is present to access Vault
+﻿using System.Drawing;
 using Grasshopper.Kernel;
-using Grasshopper.Kernel.Parameters;
-using Rhino;
-using Rhino.Geometry;
-using System;
-using System.Collections.Generic;
-using VoussoirPlugin03.Properties;
 using Grasshopper.Kernel.Data;
+using Grasshopper.Kernel.Parameters;
+using Grasshopper.Kernel.Special;
 using Grasshopper.Kernel.Types;
 using Rhino;
 using Rhino.Geometry;
-using Rhino.Geometry.Intersect;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Security.Cryptography;
 using VoussoirPlugin03.Properties;
 
 namespace Components
@@ -125,7 +116,7 @@ namespace Components
         /// </summary>
         public BarrelVaultDefiningCurves()
           : base(
-            "Barrel Vault Base Surface", 
+            "Barrel Vault Base Surface",
             "BVSrf",
             "Creates the base surface for the creation of a barrel vault",
             "Voussoir",
@@ -150,7 +141,8 @@ namespace Components
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddCurveParameter("Springer Lines", "L", "set(s) of 2 non intersecting lines", GH_ParamAccess.list);
+            pManager.AddCurveParameter("Springer Lines", "L1", "set(s) of 2 non intersecting lines", GH_ParamAccess.list);
+            //pManager.AddCurveParameter("Springer Lines", "L2", "set(s) of 2 non intersecting lines", GH_ParamAccess.list);
             pManager.AddNumberParameter("Vault Height", "H", "Arc's Height.", GH_ParamAccess.item, 2.0);
             //pManager.AddBooleanParameter("Span Direction", "SpanDirection", "0 = arcs on sides 0-1 and 2-3; 1 = arcs on sides 1-2 and 3-0.", GH_ParamAccess.item, true);
             pManager.AddIntegerParameter("Arc Profile", "A",
@@ -255,7 +247,7 @@ namespace Components
             {
                 var (A, B) = edges[ei];
                 var c = BuildSpanCurve(A, B, height, mode);
-                Curve d = c.Rebuild(20, 3, true);             
+                Curve d = c.Rebuild(20, 3, true);
                 if (d != null) arcs.Add(d);
             }
 
@@ -398,5 +390,79 @@ namespace Components
             }
             return a; // devolve melhor estimativa
         }
+        public override void AddedToDocument(GH_Document document)
+        {
+            base.AddedToDocument(document);
+
+            if (Params.Input.Count < 3)
+                return;
+
+            Param_Integer param = Params.Input[2] as Param_Integer;
+            if (param == null || param.SourceCount > 0)
+                return;
+
+            Attributes.PerformLayout();
+
+            int x = (int)param.Attributes.Pivot.X - 135;
+            int y = (int)param.Attributes.Pivot.Y - 11;
+
+            GH_ValueList valueList = new GH_ValueList();
+            valueList.CreateAttributes();
+
+            valueList.ListItems.Clear();
+            valueList.ListItems.Add(new GH_ValueListItem("Arc", "0"));
+            valueList.ListItems.Add(new GH_ValueListItem("Parabola", "1"));
+            valueList.ListItems.Add(new GH_ValueListItem("Catenary", "2"));
+
+            valueList.SelectItem(0);
+
+            valueList.Attributes.Pivot = new PointF(x, y);
+            valueList.Attributes.ExpireLayout();
+
+            document.AddObject(valueList, false);
+
+            param.AddSource(valueList);
+        }
+        //protected override void AfterSolveInstance()
+        //{
+        //    GH_Document doc = OnPingDocument();
+        //    if (doc == null) return;
+
+        //    // Check if the component is already inside a group
+        //    foreach (IGH_DocumentObject obj in doc.Objects)
+        //    {
+        //        if (obj is GH_Group group && group.ObjectIDs.Contains(this.InstanceGuid))
+        //        {
+        //            return;
+        //        }
+        //    }
+
+        //    // Collect component + input sources
+        //    List<Guid> ids = new List<Guid> { this.InstanceGuid };
+
+        //    foreach (IGH_Param input in this.Params.Input)
+        //    {
+        //        foreach (IGH_Param source in input.Sources)
+        //        {
+        //            ids.Add(source.InstanceGuid);
+        //        }
+        //    }
+
+        //    // Create group
+        //    GH_Group newGroup = new GH_Group
+        //    {
+        //        NickName = "",
+        //        Colour = Color.FromArgb(50, 255, 255, 255)
+        //    };
+
+        //    doc.AddObject(newGroup, false, doc.ObjectCount);
+
+        //    foreach (Guid id in ids)
+        //    {
+        //        newGroup.AddObject(id);
+        //    }
+
+        //    newGroup.ExpireCaches();
+        //}
     }
 }
