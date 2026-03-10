@@ -41,10 +41,10 @@ namespace Components
         }
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddPlaneParameter("Intrados Planes", "IntradosPlanes", "Intrados planar vault panels", GH_ParamAccess.tree);
-            pManager.AddPlaneParameter("Division planes", "DivisionPlanes", "Planes of each Voussoir Contact Surface", GH_ParamAccess.tree);
-            pManager.AddTextParameter("Boundaries", "Boundaries", "Voussoir Boundaries (Indexes of Division Planes for each voussoir).", GH_ParamAccess.tree);
-            pManager.AddNumberParameter("Voussoir Thickness", "Thickness", "User defined Voussoir Thickness", GH_ParamAccess.tree, 0.3);
+            pManager.AddPlaneParameter("Intrados Planes", "Pi", "Intrados planar vault panels", GH_ParamAccess.tree);
+            pManager.AddPlaneParameter("Division planes", "Pd", "Planes of each Voussoir Contact Surface", GH_ParamAccess.tree);
+            pManager.AddTextParameter("Boundaries", "B", "Voussoir Boundaries (Indexes of Division Planes for each voussoir).", GH_ParamAccess.tree);
+            pManager.AddNumberParameter("Voussoir Thickness", "T", "User defined Voussoir Thickness", GH_ParamAccess.tree, 0.3);
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -54,7 +54,7 @@ namespace Components
             pManager.HideParameter(1);
             pManager.AddBrepParameter("Intrados", "I", "Intrados Surfaces", GH_ParamAccess.tree);
             pManager.HideParameter(2);
-            pManager.AddBrepParameter("Contact Faces", "CF", "Voussoir contact faces", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("Contact Faces", "Fc", "Voussoir contact faces", GH_ParamAccess.tree);
             pManager.HideParameter(3);
             //pManager.AddPlaneParameter("Log", "L", "All messages generated during execution", GH_ParamAccess.tree);
         }
@@ -197,25 +197,11 @@ namespace Components
                         intLinesEnd.Add(l.To);
                     }
 
-                    //Debug.WriteLine($"intLines: {intLines.Count}");
-
-
-                    //planes.AppendRange(newIntLines.Select(pl => new GH_Line(pl)), path);
-                    //new normal
-                    Point3d normalStart = Utils.AveragePoint(intLinesStart);
-                    Point3d normalEnd = Utils.AveragePoint(intLinesEnd);
-                    var newNormal = new Line(normalStart, normalEnd);
-                    var newNormalVector = newNormal.Direction;
-                    newNormalVector.Unitize();
-                    if (newNormalVector * intradosPlane.ZAxis < 0)
-                    {
-                        newNormalVector = -newNormalVector; // Reverse direction if not opposite
-                    }                                        
+                    //Debug.WriteLine($"intLines: {intLines.Count}");                                   
 
                     //Extrados Plane
-                    var extradosPlaneOrigin = intradosPlane.Origin + newNormalVector * thickness;
+                    var extradosPlaneOrigin = intradosPlane.Origin + intradosPlane.ZAxis * thickness;
                     var extradosPlane = new Plane(extradosPlaneOrigin, intradosPlane.XAxis, intradosPlane.YAxis);
-
 
                     //intrados Surface
                     List<Point3d> intradosPoints = new List<Point3d>();

@@ -39,28 +39,28 @@ namespace Components
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             // Now accepts a tree of surfaces
-            pManager.AddSurfaceParameter("Vault Surface", "VaultSurface", "Surface(s) that define the vault. Provide as a tree where each branch corresponds to one vault (1 or multiple surfaces).", GH_ParamAccess.tree);
+            pManager.AddSurfaceParameter("Vault Surface", "S", "Surface(s) that define the vault. Provide as a tree where each branch corresponds to one vault (1 or multiple surfaces).", GH_ParamAccess.tree);
             pManager.AddIntegerParameter(
-                "Springer Divisions", "SpringerDivisions",
-                "Number of voussoir divisions along the Springer Lines\nMinimum: 1",
+                "U Divisions", "U",
+                "Number of voussoir divisions along the U direction (Springer Lines direction)\nMinimum: 1",
                 GH_ParamAccess.tree, 8);
 
             pManager.AddIntegerParameter(
-                "Profile Divisions", "ProfileDivisions",
-                "Number of voussoir divisions along the Vault's Profile\nMinimum: 3",
+                "V Divisions", "V",
+                "Number of voussoir divisions along the V direction (Profile direction)\nMinimum: 3",
                 GH_ParamAccess.tree, 12);          
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddPlaneParameter("Intrados Planes", "IP", "Intrados planar vault panels (tree matching input branches).", GH_ParamAccess.tree);
-            pManager.AddPlaneParameter("Division planes", "DP", "Planes of each Voussoir Contact Surface (tree matching input branches).", GH_ParamAccess.tree);
+            pManager.AddPlaneParameter("Intrados Planes", "Pi", "Intrados planar vault panels (tree matching input branches).", GH_ParamAccess.tree);
+            pManager.AddPlaneParameter("Division planes", "Pd", "Planes of each Voussoir Contact Surface (tree matching input branches).", GH_ParamAccess.tree);
             pManager.HideParameter(1);
             pManager.AddTextParameter("Boundaries", "B", "Voussoir Boundaries (Indexes of Division Planes).", GH_ParamAccess.tree);
             pManager.HideParameter(2);
-            pManager.AddPlaneParameter("Transversal planes", "TP", "Division Planes along Springer.", GH_ParamAccess.list);
+            pManager.AddPlaneParameter("U Planes", "Pu", "Division Planes with constant U-value.", GH_ParamAccess.list);
             pManager.HideParameter(3);
-            pManager.AddPlaneParameter("Longitudinal planes", "LP", "Division Planes along Profile.", GH_ParamAccess.list);
+            pManager.AddPlaneParameter("V Planes", "Pv", "Division Planes with constant V-value.", GH_ParamAccess.list);
             pManager.HideParameter(4);
         }
 

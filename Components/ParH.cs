@@ -34,7 +34,7 @@ namespace VoussoirPlugin03.Components
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddCurveParameter("Parabola", "C", "Parabola curve.", GH_ParamAccess.item);
+            pManager.AddCurveParameter("Parabola", "P", "Parabola curve.", GH_ParamAccess.item);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)

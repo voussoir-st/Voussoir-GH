@@ -277,18 +277,18 @@ namespace VoussoirPlugin03.Components
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddBrepParameter("Vault Surface", "VaultSurface", "Surface that defines the vault", GH_ParamAccess.tree);
-            pManager.AddCurveParameter("Springer Line", "SpringerLine", "List of base lines to create vault springers", GH_ParamAccess.tree);
-            pManager.AddBrepParameter("Voussoirs", "Voussoirs", "Voussoirs to analyse", GH_ParamAccess.tree);
-            pManager.AddPlaneParameter("Transversal Planes", "TransversalPlanes", "Planes at each span division", GH_ParamAccess.tree);
-            pManager.AddNumberParameter("Springer Width", "SpringerWidth", "Distance perpendicular to springer line", GH_ParamAccess.tree, 0.3);
+            pManager.AddBrepParameter("Vault Surface", "S", "Surface that defines the vault", GH_ParamAccess.tree);
+            pManager.AddCurveParameter("Springer Line", "L", "List of base lines to create vault springers", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("Voussoirs", "V", "Voussoirs to analyse", GH_ParamAccess.tree);
+            pManager.AddPlaneParameter("U Planes", "Pu", "Division Planes with constant U-value.", GH_ParamAccess.tree);
+            pManager.AddNumberParameter("Springer Width", "W", "Distance perpendicular to springer line", GH_ParamAccess.tree, 0.3);
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
             pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
             pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
-            pManager.AddCurveParameter("Top Wall Line", "WL", "Lines to build walls on the springers", GH_ParamAccess.tree);
+            pManager.AddCurveParameter("Top Wall Line", "L", "Lines to build walls on the springers", GH_ParamAccess.tree);
         //    pManager.AddPointParameter("Log", "p1", "All messages generated during execution", GH_ParamAccess.tree);
         //    pManager.AddPointParameter("Log", "p2", "All messages generated during execution", GH_ParamAccess.tree);
         //    pManager.AddPointParameter("Log", "p3", "All messages generated during execution", GH_ParamAccess.tree);

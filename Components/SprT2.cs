@@ -32,10 +32,10 @@ namespace VoussoirPlugin03.Components
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddBrepParameter("Vault Surface", "VaultSurface", "Surface that defines the vault", GH_ParamAccess.tree);
-            pManager.AddCurveParameter("Springer Line", "SpringerLine", "List of base lines to create vault springers", GH_ParamAccess.tree);
-            pManager.AddBrepParameter("Voussoirs", "Voussoirs", "Voussoirs to analyse", GH_ParamAccess.tree);
-            pManager.AddPlaneParameter("Transversal Planes", "TransversalPlanes", "Planes at each span division", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("Vault Surface", "S", "Surface that defines the vault", GH_ParamAccess.tree);
+            pManager.AddCurveParameter("Springer Line", "L", "List of base lines to create vault springers", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("Voussoirs", "V", "Voussoirs to analyse", GH_ParamAccess.tree);
+            pManager.AddPlaneParameter("U Planes", "Pu", "Division Planes with constant U-value.", GH_ParamAccess.tree);
             //pManager.AddNumberParameter("Springer Width", "SpringerWidth", "Distance perpendicular to springer line", GH_ParamAccess.item, 0.3);
         }
 
