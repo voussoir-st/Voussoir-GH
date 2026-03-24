@@ -1,5 +1,4 @@
-﻿using Components;
-using Grasshopper.Kernel;
+﻿using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino;
@@ -12,8 +11,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using VoussoirPlugin03.Components.BaseSurface;
 
-namespace VoussoirPlugin03.Components
+namespace VoussoirPlugin03.Components.Springers
 {
     public class SprTri : GH_Component
     {

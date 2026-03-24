@@ -3,7 +3,7 @@ using Rhino.Geometry;
 using System;
 using VoussoirPlugin03.Properties;
 
-namespace VoussoirPlugin03.Components
+namespace VoussoirPlugin03.Components.Wootils
 {
     public class ParabolaFromPoints : GH_Component
     {
@@ -56,7 +56,7 @@ namespace VoussoirPlugin03.Components
             // Midpoint between start and end, elevated by rise in Z
             Point3d mid = 0.5 * (start + end) + Vector3d.ZAxis * rise;
             // Interpolated curve through three points
-            return NurbsCurve.CreateInterpolatedCurve(new[] { start, mid, end }, 2);
+            return NurbsCurve.CreateInterpolatedCurve(new[] { start, mid, end }, 3);
         }
     }
 }

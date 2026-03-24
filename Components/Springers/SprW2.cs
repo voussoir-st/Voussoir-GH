@@ -1,5 +1,4 @@
-﻿using Components;
-using Grasshopper.Kernel;
+﻿using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino;
@@ -14,9 +13,10 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Windows.Forms;
+using VoussoirPlugin03.Components.BaseSurface;
 using static Rhino.DocObjects.PhysicallyBasedMaterial;
 
-namespace VoussoirPlugin03.Components
+namespace VoussoirPlugin03.Components.Springers
 {
     public static class TreeUtils
     {

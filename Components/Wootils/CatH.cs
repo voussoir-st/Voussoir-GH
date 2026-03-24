@@ -3,7 +3,7 @@ using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
 
-namespace Components
+namespace VoussoirPlugin03.Components.Wootils
 {
     public class CatenaryFromPoints : GH_Component
     {

@@ -1,22 +1,16 @@
-﻿using Components;
-using Grasshopper.Kernel;
+﻿using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino;
-using Rhino.Display;
 using Rhino.Geometry;
 using Rhino.Geometry.Intersect;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Windows.Forms;
-using static Rhino.DocObjects.PhysicallyBasedMaterial;
+using VoussoirPlugin03.Components.BaseSurface;
 
-namespace VoussoirPlugin03.Components
+namespace VoussoirPlugin03.Components.Springers
 {
     public class VoussoirCreate1 : GH_Component
     {
@@ -62,10 +56,10 @@ namespace VoussoirPlugin03.Components
             GH_Structure<GH_Brep> voussoirsTree = new GH_Structure<GH_Brep>();
             GH_Structure<GH_Plane> transPlanesTree = new GH_Structure<GH_Plane>();
 
-            if (!DA.GetDataTree(0, out surfacesTree));
-            if (!DA.GetDataTree(1, out springerLinesTree));
-            if (!DA.GetDataTree(2, out voussoirsTree));
-            if (!DA.GetDataTree(3, out transPlanesTree));
+            if (!DA.GetDataTree(0, out surfacesTree)) ;
+            if (!DA.GetDataTree(1, out springerLinesTree)) ;
+            if (!DA.GetDataTree(2, out voussoirsTree)) ;
+            if (!DA.GetDataTree(3, out transPlanesTree)) ;
 
             //Per Vault
             GH_Structure<GH_Brep> outspringers = new GH_Structure<GH_Brep>();
@@ -97,7 +91,7 @@ namespace VoussoirPlugin03.Components
                 List<Brep> voussoirs = voussoirsTree.Branches[voussoirsTree.Paths.IndexOf(path)].Select(x => x.Value).ToList();
                 List<Plane> transPlanes = transPlanesTree.Branches[transPlanesTree.Paths.IndexOf(path)].Select(x => x.Value).ToList();
                 var alignedsurface = PolylineUtils.AlignNormalToWorldZ(surface.Surfaces[0]);
-               
+
                 // 2️⃣ Compute the centroid of each Brep
                 List<Point3d> centroids = voussoirs
                     .Select(v =>

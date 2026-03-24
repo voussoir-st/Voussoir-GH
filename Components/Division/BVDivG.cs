@@ -1,5 +1,4 @@
-﻿using Components; // Ensure this is present to access Vault utilities (PolylineUtils, Utils, etc.)
-using Grasshopper;
+﻿using Grasshopper;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
@@ -9,10 +8,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using VoussoirPlugin03.Components;
+using VoussoirPlugin03.Components.Springers;
 using VoussoirPlugin03.Properties;
 
-namespace Components
+namespace VoussoirPlugin03.Components.Division
 {
     public class IrregularVaultDivisionComponent : GH_Component
     {
@@ -22,7 +21,7 @@ namespace Components
                 "BVDivG",
                 "Divides a vault defined by two arcs into spanwise and lengthwise voussoirs. Accepts a tree of surfaces (each branch one or more surfaces).",
                 "Voussoir",
-                "Core Geometry"
+                "Division"
                 )
         { }
 

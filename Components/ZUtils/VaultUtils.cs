@@ -1,7 +1,7 @@
 ﻿using Rhino.Geometry;
 using System.Collections.Generic;
 
-namespace Components
+namespace VoussoirPlugin03.Components.Utils
 {
     public static class Utils
     {

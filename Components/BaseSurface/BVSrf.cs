@@ -1,5 +1,4 @@
-﻿using System.Drawing;
-using Grasshopper.Kernel;
+﻿using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Parameters;
 using Grasshopper.Kernel.Special;
@@ -8,9 +7,10 @@ using Rhino;
 using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using VoussoirPlugin03.Properties;
 
-namespace Components
+namespace VoussoirPlugin03.Components.BaseSurface
 {
     public static class PolylineUtils
     {
@@ -120,7 +120,7 @@ namespace Components
             "BVSrf",
             "Creates the base surface for the creation of a barrel vault",
             "Voussoir",
-            "Core Geometry"
+            "Base Surface"
           )
         {
         }
@@ -141,8 +141,7 @@ namespace Components
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddCurveParameter("Springer Lines", "L1", "set(s) of 2 non intersecting lines", GH_ParamAccess.list);
-            //pManager.AddCurveParameter("Springer Lines", "L2", "set(s) of 2 non intersecting lines", GH_ParamAccess.list);
+            pManager.AddCurveParameter("Springer Lines", "L", "set(s) of 2 non intersecting lines", GH_ParamAccess.list);
             pManager.AddNumberParameter("Vault Height", "H", "Arc's Height.", GH_ParamAccess.item, 2.0);
             //pManager.AddBooleanParameter("Span Direction", "SpanDirection", "0 = arcs on sides 0-1 and 2-3; 1 = arcs on sides 1-2 and 3-0.", GH_ParamAccess.item, true);
             pManager.AddIntegerParameter("Arc Profile", "A",
@@ -247,8 +246,8 @@ namespace Components
             {
                 var (A, B) = edges[ei];
                 var c = BuildSpanCurve(A, B, height, mode);
-                Curve d = c.Rebuild(20, 3, true);
-                if (d != null) arcs.Add(d);
+                //Curve d = c.Rebuild(200, 3, true);
+                if (c != null) arcs.Add(c);
             }
 
             // Build the two horizontal line curves for the vault
@@ -267,7 +266,7 @@ namespace Components
             if (loftBreps != null && loftBreps.Length > 0)
             {
                 // Align the normal of the first lofted surface to World Z
-                var alignedSurface = Components.PolylineUtils.AlignNormalToWorldZ(loftBreps[0].Surfaces[0]);
+                var alignedSurface = PolylineUtils.AlignNormalToWorldZ(loftBreps[0].Surfaces[0]);
                 Surface loftSurface = alignedSurface;
                 DA.SetData(0, loftSurface); // Output index 2 for the surface
             }
@@ -316,11 +315,10 @@ namespace Components
                     // Parábola por 3 pontos
                     {
                         Point3d mid = 0.5 * (start + end) + Vector3d.ZAxis * h;
-                        return NurbsCurve.CreateInterpolatedCurve(new[] { start, mid, end }, 2);
+                        return NurbsCurve.CreateInterpolatedCurve(new[] { start, mid, end }, 3);
                     }
             }
         }
-
         private Curve BuildCatenary(Point3d start, Point3d end, double rise, int samples)
         {
             // Draw catenary in a vertical plane between start and end (Z axis is up)
@@ -368,7 +366,6 @@ namespace Components
             }
             return Curve.CreateInterpolatedCurve(pts, 3);
         }
-
         private double SolveCatenaryA(double span, double rise)
         {
             // Resolve f(a) = a*cosh((span/2)/a) - a - rise = 0

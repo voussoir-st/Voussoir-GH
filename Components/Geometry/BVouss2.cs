@@ -1,21 +1,14 @@
-﻿using Components; // Ensure this is present to access Vault
-using Grasshopper;
-using Grasshopper.Kernel;
+﻿using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
-using Grasshopper.Kernel.Geometry.Voronoi;
-using Grasshopper.Kernel.Parameters;
 using Grasshopper.Kernel.Types;
 using Rhino;
 using Rhino.Geometry;
 using Rhino.Geometry.Intersect;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Security.Cryptography;
-using VoussoirPlugin03.Properties;
 
-namespace Components
+namespace VoussoirPlugin03.Components.Geometry
 {
     public class VoussoirCreate2 : GH_Component
     {
@@ -25,7 +18,7 @@ namespace Components
                "BVouss",
                "Creates Voussoirs based on predefined planes.",
                "Voussoir",
-               "Core Geometry"
+               "Geometry"
                )
         { }
 
@@ -82,8 +75,8 @@ namespace Components
 
             //Per Vault
             GH_Structure<GH_Brep> voussoirsTree = new GH_Structure<GH_Brep>();
-            GH_Structure<GH_Brep> extradosTree = new GH_Structure<GH_Brep>(); 
-            GH_Structure<GH_Brep> intradosTree = new GH_Structure<GH_Brep>(); 
+            GH_Structure<GH_Brep> extradosTree = new GH_Structure<GH_Brep>();
+            GH_Structure<GH_Brep> intradosTree = new GH_Structure<GH_Brep>();
             GH_Structure<GH_Brep> contactFacesTree = new GH_Structure<GH_Brep>();
             GH_Structure<GH_Plane> log = new GH_Structure<GH_Plane>();
 
@@ -162,7 +155,7 @@ namespace Components
                         return t;
                     }).ToList();
 
-                    
+
                     //Debug.WriteLine($"sortedPlanes: {sortedPlanes.Count}");
                     //log.Append(new GH_Curve(fittedCircle.ToNurbsCurve()));
 
@@ -237,7 +230,7 @@ namespace Components
                         Intersection.LinePlane(l, extradosPlane, out t);
                         extradosPoints.Add(l.PointAt(t));
                     }
-                    List<Point3d> extradosPolylinePoints = new List<Point3d>(extradosPoints); 
+                    List<Point3d> extradosPolylinePoints = new List<Point3d>(extradosPoints);
                     extradosPolylinePoints.Add(extradosPoints[0]);
                     var extradosPolyline = new Polyline(extradosPolylinePoints);
                     //var extradosSurface = Brep.CreatePlanarBreps(new PolylineCurve(extradosPolyline), RhinoMath.ZeroTolerance);
@@ -279,14 +272,14 @@ namespace Components
                     //Debug.WriteLine($"contactFaces: {contactFaces.Count}");
                     var joinedCF = Brep.JoinBreps(contactFaces, RhinoMath.ZeroTolerance);
                     contactFacesTree.Append(new GH_Brep(joinedCF[0]), path);
-                    
+
                     //Voussoirs
                     List<Brep> voussoirParts = new List<Brep>();
                     voussoirParts.Add(intradosSurface.ToBrep());
                     voussoirParts.Add(extradosSurface.ToBrep());
                     voussoirParts.Add(joinedCF[0]);
-                    var voussoir = Brep.JoinBreps(voussoirParts, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);                    
-                    voussoirsTree.Append(new GH_Brep(voussoir[0]), path);                    
+                    var voussoir = Brep.JoinBreps(voussoirParts, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+                    voussoirsTree.Append(new GH_Brep(voussoir[0]), path);
                 }
             }
 
