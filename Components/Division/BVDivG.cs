@@ -219,7 +219,7 @@ namespace VoussoirPlugin03.Components.Division
                 if (loftBrep == null || loftBrep.Surfaces.Count == 0) continue;
 
                 // Align normal to world Z (keeps original behaviour)
-                Surface loftSrf = Components.PolylineUtils.AlignNormalToWorldZ(loftBrep.Surfaces[0]);
+                Surface loftSrf = Components.BaseSurface.PolylineUtils.AlignNormalToWorldZ(loftBrep.Surfaces[0]);
 
                 // ---------- Extract boundary curves (arcs) ----------
                 Curve[] boundaryCurvesArray = loftBrep.DuplicateEdgeCurves(true);
@@ -242,7 +242,7 @@ namespace VoussoirPlugin03.Components.Division
                 // Orient arcs if you have a utility for that (keeps previous behaviour)
                 try
                 {
-                    Components.Utils.OrientArcs(new List<Curve> { arc1, arc2 });
+                    Utils.Utils.OrientArcs(new List<Curve> { arc1, arc2 });
                 }
                 catch
                 {

@@ -74,7 +74,7 @@ namespace VoussoirPlugin03.Components.BaseSurface
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             double tol = 0.0001;
-            _previewPts.Clear();
+            //_previewPts.Clear();
             // Declare input variables
             List<Curve> springerLines = new List<Curve>();
             List<Curve> springerLines2 = new List<Curve>();
@@ -535,7 +535,7 @@ namespace VoussoirPlugin03.Components.BaseSurface
             if (springerLines == null || springerLines.Count < 2)
                 return (false, null, null, null);
 
-            Components.Utils.OrientArcs(springerLines);
+            Utils.Utils.OrientArcs(springerLines);
 
             // Verificar interseção
             var events = Rhino.Geometry.Intersect.Intersection.CurveCurve(
@@ -585,7 +585,7 @@ namespace VoussoirPlugin03.Components.BaseSurface
                 if (c != null) arcs.Add(c);
             }
 
-            Components.Utils.OrientArcs(arcs);
+            Utils.Utils.OrientArcs(arcs);
 
             // Criar linhas
             var lines = new List<Curve>();
@@ -600,7 +600,7 @@ namespace VoussoirPlugin03.Components.BaseSurface
             if (loftBreps == null || loftBreps.Length == 0)
                 return (false, null, lines, arcs);
 
-            var alignedSurface = Components.PolylineUtils.AlignNormalToWorldZ(loftBreps[0].Surfaces[0]);
+            var alignedSurface = Components.BaseSurface.PolylineUtils.AlignNormalToWorldZ(loftBreps[0].Surfaces[0]);
 
             return (true, alignedSurface, lines, arcs);
         }

@@ -5,9 +5,9 @@ using System.Collections.Generic;
 
 namespace VoussoirPlugin03.Components.Wootils
 {
-    public class CatenaryFromPoints : GH_Component
+    public class CatFromPoints : GH_Component
     {
-        public CatenaryFromPoints()
+        public CatFromPoints()
           : base("Catenary by Height", "CatH",
             "Create an upward parabola between two points and a given height.",
             "Voussoir", "Wootils")

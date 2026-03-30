@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using VoussoirPlugin03.Properties;
+using VoussoirPlugin03.Components;
 
 namespace VoussoirPlugin03.Components.BaseSurface
 {
@@ -196,7 +197,7 @@ namespace VoussoirPlugin03.Components.BaseSurface
             var linesTree = new GH_Structure<GH_Curve>();
             var arcsTree = new GH_Structure<GH_Curve>();
 
-            Components.Utils.OrientArcs(springerLines);
+            Utils.Utils.OrientArcs(springerLines);
             bool intersectLines = false;
             if (springerLines.Count >= 2)
             {
@@ -259,7 +260,7 @@ namespace VoussoirPlugin03.Components.BaseSurface
             }
 
             // Orient the arcs using the utility function (may flip direction for consistency)
-            Components.Utils.OrientArcs(arcs);
+            Utils.Utils.OrientArcs(arcs);
 
             // Create the lofted surface between the two arcs
             var loftBreps = Brep.CreateFromLoft(arcs, Point3d.Unset, Point3d.Unset, LoftType.Normal, false);
@@ -276,7 +277,7 @@ namespace VoussoirPlugin03.Components.BaseSurface
             }
 
             lines.Reverse();
-            Components.Utils.OrientArcs(lines);
+            Utils.Utils.OrientArcs(lines);
 
             foreach (var l in lines)
                 linesTree.Append(new GH_Curve(l), currentPath);
