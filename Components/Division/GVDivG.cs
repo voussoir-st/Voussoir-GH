@@ -62,39 +62,46 @@ namespace VoussoirPlugin03.Components.Division
             pManager.HideParameter(2);
             pManager.AddPlaneParameter("U Planes", "Pu", "Division Planes with constant U-value.", GH_ParamAccess.list);
             pManager.HideParameter(3);
-            pManager.AddPlaneParameter("V Planes", "Pv", "Division Planes with constant V-value.", GH_ParamAccess.list);
-            pManager.HideParameter(4);
+            pManager.AddGenericParameter("V Planes", "Pv", "Division Planes with constant V-value.", GH_ParamAccess.list);
+            //pManager.HideParameter(4);
             pManager.AddGenericParameter("V Planes", "Pv", "Division Planes with constant V-value.", GH_ParamAccess.list);
         }
-        private List<Point3d> _previewPts = new List<Point3d>();
-        private List<Curve> _previewCrvs = new List<Curve>();
+        //private List<Point3d> _previewPts = new List<Point3d>();
+        //private List<Curve> _previewCrvs = new List<Curve>();
         //private List<GeometryBase> _previewBrep = new List<GeometryBase>();
         public override bool IsPreviewCapable => true;
-        public override void DrawViewportWires(IGH_PreviewArgs args)
-        {
-            base.DrawViewportWires(args);
+        //public override void DrawViewportWires(IGH_PreviewArgs args)
+        //{
+        //    base.DrawViewportWires(args);
 
-            // Draw points
-            foreach (var pt in _previewPts)
-            {
-                args.Display.DrawPoint(pt, Rhino.Display.PointStyle.RoundSimple, 3, System.Drawing.Color.DarkRed);
-            }
+        //    // Draw points
+        //    foreach (var pt in _previewPts)
+        //    {
+        //        args.Display.DrawPoint(pt, Rhino.Display.PointStyle.RoundSimple, 3, System.Drawing.Color.DarkRed);
+        //    }
 
-            // Draw curves
-            foreach (var crv in
-                _previewCrvs)
-            {
-                if (crv != null && crv.IsValid)
-                    args.Display.DrawCurve(crv, System.Drawing.Color.DarkRed, 2);
-            }
-        }
+        //    // Draw curves
+        //    foreach (var crv in
+        //        _previewCrvs)
+        //    {
+        //        if (crv != null && crv.IsValid)
+        //            args.Display.DrawCurve(crv, System.Drawing.Color.DarkRed, 2);
+        //    }
+        //}
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
-            
-            _previewPts.Clear();
-            _previewCrvs.Clear();
-            List<GeometryBase> _previewBrep = new List<GeometryBase>();
+            // Output trees
+            var panelPlanesTree = new GH_Structure<GH_Plane>();        // Intrados (per vault -> per cell)
+            var divisionPlanesTree = new GH_Structure<GH_Plane>();     // Each branch {branch; s; l} holds 4 planes per cell
+            var boundaries = new GH_Structure<GH_String>();
+            var transversalPlanesTree = new GH_Structure<GH_Plane>(); // Per vault branch -> transversal planes indexed by l
+            var longitudinalPlanesTree = new GH_Structure<GH_Plane>(); // Per vault branch -> longitudinal planes indexed by s
+
+            //_previewPts.Clear();
+            //_previewCrvs.Clear();
+            List<Plane> _previewBrep = new List<Plane>();
+            List<GeometryBase> _previewCrvs = new List<GeometryBase>();
 
             double tol = 0.0001;
             var vaultTree = new GH_Structure<GH_Surface>();
@@ -129,7 +136,7 @@ namespace VoussoirPlugin03.Components.Division
                 foreach (var ghInt in VTree1[p])
                     V2Fallback.Add(ghInt.Value);
             }
-
+            int q = 0;
             foreach (GH_Path branchPath in vaultTree.Paths)
             {
                 // Default values
@@ -338,8 +345,13 @@ namespace VoussoirPlugin03.Components.Division
                 //splitPlanes.RemoveAt(0);
                 //_previewBrep.AddRange(splitPlanes);
                 int i = 0;
+                
                 foreach (var s in breps)
                 {
+                    var surfaceBoundaries = new List<String>();
+                    var vaultdivisionPlanesTree = new List<Plane>();
+                    var surf = s.Faces[0].UnderlyingSurface();
+                    var sAlign = BaseSurface.PolylineUtils.AlignNormalToWorldZ(surf);
                     //Debug.WriteLine($"\nvault: {i}");
                     Curve arc = arcs[i];
                     List<Point3d> arcUpoints = new List<Point3d>();
@@ -367,6 +379,7 @@ namespace VoussoirPlugin03.Components.Division
                         }
 
                         arcUpoints.AddRange(intersectionPoints);
+                        //_previewCrvs.AddRange(intersectionPoints.Select(a => new Point(a)));
 
                         foreach (var v in notCand)
                         {
@@ -380,11 +393,15 @@ namespace VoussoirPlugin03.Components.Division
                         }
                     }
 
+                    var nc = Curve.JoinCurves(notCand)[0];
+                    if (new Vector3d(nc.PointAtEnd - nc.PointAtStart) * new Vector3d(arc.PointAtEnd - arc.PointAtStart) < 0) 
+                        nc.Reverse();
+
                     ncUpoints = ncUpoints
                         .OrderBy(u =>
                         {
                             double t;
-                            arc.ClosestPoint(u, out t);
+                            nc.ClosestPoint(u, out t);
                             return t;
                         })
                         .ToList();
@@ -393,15 +410,17 @@ namespace VoussoirPlugin03.Components.Division
                          .OrderBy(u =>
                          {
                              double t;
-                             arc.ClosestPoint(u, out t);   // <-- THIS is the key difference
+                             arc.ClosestPoint(u, out t);
                              return t;
                          })
                          .ToList();
+
+                    //_previewCrvs.AddRange(ncUpoints.Select(a => new Point(a)));
+
                     List<Curve> ULines = new List<Curve>();
                     for (int a = 0; a < ncUpoints.Count; a++)
-                    {
-                        var l = new Line(arcUpoints[a], ncUpoints[a]);
-                        ULines.Add(new LineCurve(l));
+                    {                        
+                        ULines.Add(new LineCurve(new Line(arcUpoints[a], ncUpoints[a])));
                     }
 
                     var CrvLongest = ULines.OrderByDescending(l => l.GetLength()).First();
@@ -420,7 +439,7 @@ namespace VoussoirPlugin03.Components.Division
                     //interUCrvs.Insert(interUCrvs.Count, springerLines[i * 2]);
                     //interUCrvs.Insert(0, springerLines[i * 2 + 1]);
 
-                    //_previewBrep.AddRange(ULines);
+                    //_previewCrvs.AddRange(ULines);
 
                     var p0 = arc.PointAtStart;
                     var p1 = arc.PointAtEnd;
@@ -471,11 +490,8 @@ namespace VoussoirPlugin03.Components.Division
                         
                         intUPoints1.Add(c1.PointAtEnd);
                         intUPoints2.Add(c2.PointAtEnd);
-                        //Debug.WriteLine($"intUPoints1: {intUPoints1.Count}");
-                        //Debug.WriteLine($"intUPoints2: {intUPoints2.Count}");
-                        //Intrados
-                        //_previewBrep.AddRange(intUPoints1.Select(p => new Point(p)));
-                        //_previewBrep.AddRange(intUPoints2.Select(p => new Point(p)));
+                        intUPoints1 = intUPoints1.Distinct().ToList();
+                        intUPoints2 = intUPoints2.Distinct().ToList();
 
                         if (intUPoints1.Count < intUPoints2.Count)
                         {
@@ -502,8 +518,8 @@ namespace VoussoirPlugin03.Components.Division
                                 intUPoints1.RemoveRange(start, count);
                         }
 
-                        //_previewBrep.AddRange(intUPoints1.Select(p => new Point(p)));
-                        //_previewBrep.AddRange(intUPoints2.Select(p => new Point(p)));
+                        //_previewCrvs.AddRange(intUPoints1.Select(p => new Point(p)));
+                        //_previewCrvs.AddRange(intUPoints2.Select(p => new Point(p)));
                         List<Plane> intradosPlanes = new List<Plane>();
                         
                         for (int k = 0; k < intUPoints1.Count - 1; k++)
@@ -513,7 +529,7 @@ namespace VoussoirPlugin03.Components.Division
                             var ip3 = intUPoints2[k + 1];
                             var ip4 = intUPoints2[k];
 
-                            List<Point3d> ipPoints1 = new List<Point3d> { ip1, ip2, ip3, ip4 , ip1};
+                            List<Point3d> ipPoints1 = new List<Point3d> { ip1, ip2, ip3, ip4, ip1 };
 
                             var ipavg = new Point3d(
                                 (ip1.X + ip2.X + ip3.X + ip4.X) / 4.0,
@@ -523,72 +539,80 @@ namespace VoussoirPlugin03.Components.Division
 
                             Plane iPlane;
                             Plane.FitPlaneToPoints(ipPoints1, out iPlane);
-                            iPlane = new Plane(ipavg, iPlane.ZAxis);
-                            intradosPlanes.Add(iPlane);
 
+                            iPlane = new Plane(ipavg, iPlane.ZAxis);
+
+                            double u, v;
+                            sAlign.ClosestPoint(iPlane.Origin, out u, out v);
+                            iPlane = new Plane(iPlane.Origin, sAlign.NormalAt(u, v));                           
+                            
                             // Midpoints
                             var ip1_2 = new Point3d((ip1.X + ip2.X) / 2, (ip1.Y + ip2.Y) / 2, (ip1.Z + ip2.Z) / 2);
                             var ip2_3 = new Point3d((ip2.X + ip3.X) / 2, (ip2.Y + ip3.Y) / 2, (ip2.Z + ip3.Z) / 2);
                             var ip3_4 = new Point3d((ip3.X + ip4.X) / 2, (ip3.Y + ip4.Y) / 2, (ip3.Z + ip4.Z) / 2);
                             var ip4_1 = new Point3d((ip4.X + ip1.X) / 2, (ip4.Y + ip1.Y) / 2, (ip4.Z + ip1.Z) / 2);
 
-                            if (s.ClosestPoint(ip1_2, out Point3d aa, out ComponentIndex ab, out double ac, out double ad, 0.0, out Vector3d normal_ip1_2))
-                            {
-                                normal_ip1_2.Unitize();
+                            var ip1N = Components.BaseSurface.PolylineUtils.GetBrepNormalAtPoint(s.Faces[0].UnderlyingSurface().ToBrep(), ip1, 1);
+                            var ip2N = Components.BaseSurface.PolylineUtils.GetBrepNormalAtPoint(s.Faces[0].UnderlyingSurface().ToBrep(), ip2, 1);
+                            var ip3N = Components.BaseSurface.PolylineUtils.GetBrepNormalAtPoint(s.Faces[0].UnderlyingSurface().ToBrep(), ip3, 1);
+                            var ip4N = Components.BaseSurface.PolylineUtils.GetBrepNormalAtPoint(s.Faces[0].UnderlyingSurface().ToBrep(), ip4, 1);
 
-                                if (normal_ip1_2 * iPlane.ZAxis < 0)
-                                    normal_ip1_2.Reverse();
-                            }
-                            if (s.ClosestPoint(ip2_3, out Point3d ba, out ComponentIndex bb, out double bc, out double bd, 0.0, out Vector3d normal_ip2_3))
-                            {
-                                normal_ip2_3.Unitize();
+                            Vector3d ip1_2N_avg = new Vector3d(
+                                (ip1N.X + ip2N.X) / 2.0,
+                                (ip1N.Y + ip2N.Y) / 2.0,
+                                (ip1N.Z + ip2N.Z) / 2.0);
+                            Vector3d ip2_3N_avg = new Vector3d(
+                                (ip2N.X + ip3N.X) / 2.0,
+                                (ip2N.Y + ip3N.Y) / 2.0,
+                                (ip2N.Z + ip3N.Z) / 2.0);
+                            Vector3d ip3_4N_avg = new Vector3d(
+                                (ip3N.X + ip4N.X) / 2.0,
+                                (ip3N.Y + ip4N.Y) / 2.0,
+                                (ip3N.Z + ip4N.Z) / 2.0);
+                            Vector3d ip4_1N_avg = new Vector3d(
+                                (ip4N.X + ip1N.X) / 2.0,
+                                (ip4N.Y + ip1N.Y) / 2.0,
+                                (ip4N.Z + ip1N.Z) / 2.0);
+                            Vector3d ipN_avg = new Vector3d(
+                                (ip1N.X + ip2N.X + ip3N.X + ip4N.X) / 4.0,
+                                (ip1N.Y + ip2N.Y + ip3N.Y + ip4N.Y) / 4.0,
+                                (ip1N.Z + ip2N.Z + ip3N.Z + ip4N.Z) / 4.0);
 
-                                if (normal_ip2_3 * iPlane.ZAxis < 0)
-                                    normal_ip2_3.Reverse();
-                            }
-                            if (s.ClosestPoint(ip3_4, out Point3d ca, out ComponentIndex cb, out double cc, out double cd, 0.0, out Vector3d normal_ip3_4))
-                            {
-                                normal_ip3_4.Unitize();
+                            iPlane = new Plane(iPlane.Origin, ipN_avg);
+                            intradosPlanes.Add(iPlane);
 
-                                if (normal_ip3_4 * iPlane.ZAxis < 0)
-                                    normal_ip3_4.Reverse();
-                            }
-                            if (s.ClosestPoint(ip4_1, out Point3d da, out ComponentIndex db, out double dc, out double dd, 0.0, out Vector3d normal_ip4_1))
-                            {
-                                normal_ip4_1.Unitize();
-
-                                if (normal_ip4_1 * iPlane.ZAxis < 0)
-                                    normal_ip4_1.Reverse();
-                            }
-
-                            Vector3d n1 = (normal_ip4_1 + normal_ip1_2) * 0.5;
-                            n1.Unitize();
-                            Vector3d n2 = (normal_ip1_2 + normal_ip2_3) * 0.5;
-                            Vector3d n3 = (normal_ip2_3 + normal_ip3_4) * 0.5;
-                            Vector3d n4 = (normal_ip3_4 + normal_ip4_1) * 0.5;
-
-                            n2.Unitize();
-                            n3.Unitize();
-                            n4.Unitize();
-
-                            var ip5 = ip1 + n1 * VDiv2;
-                            var ip6 = ip2 + n2 * VDiv2;
-                            var ip7 = ip3 + n3 * VDiv2;
-                            var ip8 = ip4 + n4 * VDiv2;
-
-                            List<Point3d> ipPoints2 = new List<Point3d> { ip5, ip6, ip7, ip8, ip5 };
+                            var P1_2 = new Plane(ip1_2, new Vector3d(ip2 - ip1), ip1_2N_avg);
+                            var P2_3 = new Plane(ip2_3, new Vector3d(ip3 - ip2), ip2_3N_avg);
+                            var P3_4 = new Plane(ip3_4, new Vector3d(ip4 - ip3), ip3_4N_avg);
+                            var P4_1 = new Plane(ip4_1, new Vector3d(ip1 - ip4), ip4_1N_avg);
 
                             var intPl1 = new PolylineCurve(ipPoints1);
-                            var intPl2 = new PolylineCurve(ipPoints2);
-                            _previewBrep.Add(intPl1);
-                            //_previewBrep.Add(intPl2);
 
+                            var srfpl1 = intPl1.PullToBrepFace(s.Faces[0], tol);
+                            _previewCrvs.Add(srfpl1[0].ToNurbsCurve());                           
+                            //_previewBrep.Add(iPlane);
+                            
+                            panelPlanesTree.Append(new GH_Plane(iPlane), new GH_Path(q, i));
+
+                            int count = vaultdivisionPlanesTree != null ? vaultdivisionPlanesTree.Count : 0;
+                            boundaries.Append(new GH_String($"B{{{count};{count + 1};{count + 2};{count + 3}}}"), new GH_Path(q, i));
+
+                            vaultdivisionPlanesTree.Add(P1_2);
+                            vaultdivisionPlanesTree.Add(P2_3);
+                            vaultdivisionPlanesTree.Add(P3_4);
+                            vaultdivisionPlanesTree.Add(P4_1);                            
                         }
                     }
+                    divisionPlanesTree.AppendRange(vaultdivisionPlanesTree.Select(p => new GH_Plane(p)), new GH_Path(q, i));
                     i++;
                 }
+                q++;
             }
+            DA.SetDataTree(0, panelPlanesTree);
+            DA.SetDataTree(1, divisionPlanesTree);
+            DA.SetDataTree(2, boundaries);
             DA.SetDataList(5, _previewBrep);
+            DA.SetDataList(4, _previewCrvs);
         }
     }
 }

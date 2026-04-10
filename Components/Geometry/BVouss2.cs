@@ -241,13 +241,7 @@ namespace VoussoirPlugin03.Components.Geometry
                     extradosNormal.Unitize();
                     if (extradosNormal * intradosPlane.ZAxis < 0)
                         extradosSurface.Transpose();
-                    extradosTree.Append(new GH_Brep(extradosSurface.ToBrep()), path);
-
-                    //extradosTree.Append(new GH_Brep(extradosSurface[0].Faces[0].ToBrep()), path);
-                    //Debug.WriteLine($"intradosPolylinePoints: {intradosPolylinePoints.Count}");
-                    //Debug.WriteLine($"extradosPolylinePoints: {extradosPolylinePoints.Count}");
-                    //Debug.WriteLine($"intradosPoints: {intradosPoints.Count}");
-                    //Debug.WriteLine($"extradosPoints: {extradosPoints.Count}");
+                    extradosTree.Append(new GH_Brep(extradosSurface.ToBrep()), path);                    
 
                     //contact faces
                     List<Brep> contactFaces = new List<Brep>();
