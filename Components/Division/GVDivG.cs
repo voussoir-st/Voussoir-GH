@@ -490,8 +490,8 @@ namespace VoussoirPlugin03.Components.Division
                         
                         intUPoints1.Add(c1.PointAtEnd);
                         intUPoints2.Add(c2.PointAtEnd);
-                        intUPoints1 = intUPoints1.Distinct().ToList();
-                        intUPoints2 = intUPoints2.Distinct().ToList();
+                        intUPoints1 = BaseSurface.PolylineUtils.DistinctByTolerance(intUPoints1, 0.1);
+                        intUPoints2 = BaseSurface.PolylineUtils.DistinctByTolerance(intUPoints2, 0.1);
 
                         if (intUPoints1.Count < intUPoints2.Count)
                         {
@@ -587,11 +587,73 @@ namespace VoussoirPlugin03.Components.Division
                             var P4_1 = new Plane(ip4_1, new Vector3d(ip1 - ip4), ip4_1N_avg);
 
                             var intPl1 = new PolylineCurve(ipPoints1);
+                            if (k == intUPoints1.Count - 2 && j != ULines.Count / 2 - 1)
+                            {
+                                Debug.WriteLine("true");
 
-                            var srfpl1 = intPl1.PullToBrepFace(s.Faces[0], tol);
-                            _previewCrvs.Add(srfpl1[0].ToNurbsCurve());                           
+                                if (breps.Count < 2)
+                                    return;
+
+                                // --- Find the two closest breps to ip2 ---
+                                var twoClosestToIp2 =
+                                    breps
+                                        .Select(b =>
+                                        {
+                                            Point3d cp = b.ClosestPoint(ip2);
+                                            double d = ip2.DistanceTo(cp);
+                                            return new { Brep = b, Dist = d };
+                                        })
+                                        .OrderBy(x => x.Dist)
+                                        .Take(2)
+                                        .Select(x => x.Brep)
+                                        .ToList();
+
+                                var b0 = twoClosestToIp2[0];
+                                var b1 = twoClosestToIp2[1];
+
+                                // --- Normals at ip2 ---
+                                double na1, nb1;
+                                b0.Faces[0].ClosestPoint(ip2, out na1, out nb1);
+                                var n1 = b0.Faces[0].NormalAt(na1, nb1);
+                                double na2, nb2;
+                                b1.Faces[0].ClosestPoint(ip2, out na2, out nb2);
+                                var n2 = b1.Faces[0].NormalAt(na2, nb2);
+
+                                var l1 = new Line(ip2, ip2 + n1 * 0.3);
+                                var l2 = new Line(ip2, ip2 + n2 * 0.3);
+
+                                // --- Normals at ip3 ---
+                                double na3, nb3;
+                                b0.Faces[0].ClosestPoint(ip3, out na3, out nb3);
+                                var n3 = b0.Faces[0].NormalAt(na3, nb3);
+                                double na4, nb4;
+                                b1.Faces[0].ClosestPoint(ip3, out na4, out nb4);
+                                var n4 = b1.Faces[0].NormalAt(na4, nb4);
+
+                                var l3 = new Line(ip3, ip3 + n3 * 0.3);
+                                var l4 = new Line(ip3, ip3 + n4 * 0.3);
+
+                                // --- Average all four normals ---
+                                Vector3d nAvg = new Vector3d(
+                                    (n1.X + n2.X + n3.X + n4.X) / 4.0,
+                                    (n1.Y + n2.Y + n3.Y + n4.Y) / 4.0,
+                                    (n1.Z + n2.Z + n3.Z + n4.Z) / 4.0
+                                );
+
+                                // --- Preview ---
+                                //_previewCrvs.Add(new LineCurve(l1));
+                                //_previewCrvs.Add(new LineCurve(l2));
+                                _previewCrvs.Add(new LineCurve(l3));
+                                _previewCrvs.Add(new LineCurve(l4));
+
+                                // --- Final plane ---
+                                P2_3 = new Plane(ip2_3, new Vector3d(ip3 - ip2), nAvg);
+                            }
+
+                            //var srfpl1 = intPl1.PullToBrepFace(s.Faces[0], tol);
+                            //_previewCrvs.Add(intPl1.ToNurbsCurve());                           
                             //_previewBrep.Add(iPlane);
-                            
+
                             panelPlanesTree.Append(new GH_Plane(iPlane), new GH_Path(q, i));
 
                             int count = vaultdivisionPlanesTree != null ? vaultdivisionPlanesTree.Count : 0;
@@ -605,14 +667,16 @@ namespace VoussoirPlugin03.Components.Division
                     }
                     divisionPlanesTree.AppendRange(vaultdivisionPlanesTree.Select(p => new GH_Plane(p)), new GH_Path(q, i));
                     i++;
+
+
                 }
                 q++;
             }
             DA.SetDataTree(0, panelPlanesTree);
             DA.SetDataTree(1, divisionPlanesTree);
             DA.SetDataTree(2, boundaries);
-            DA.SetDataList(5, _previewBrep);
             DA.SetDataList(4, _previewCrvs);
+            DA.SetDataList(5, _previewBrep);            
         }
     }
 }

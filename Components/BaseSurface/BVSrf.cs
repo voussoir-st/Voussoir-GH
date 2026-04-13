@@ -8,13 +8,52 @@ using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using VoussoirPlugin03.Properties;
+using System.Linq;
 using VoussoirPlugin03.Components;
+using VoussoirPlugin03.Properties;
 
 namespace VoussoirPlugin03.Components.BaseSurface
 {
     public static class PolylineUtils
     {
+        public static List<Point3d> DistinctByTolerance(this IEnumerable<Point3d> pts, double tol)
+        {
+            var list = pts.ToList();
+            if (list.Count <= 1)
+                return new List<Point3d>(list);
+
+            var result = new List<Point3d>();
+
+            // Process all except the last point with normal tolerance-distinct
+            for (int i = 0; i < list.Count - 1; i++)
+            {
+                var p = list[i];
+                if (!result.Any(q => p.DistanceTo(q) <= tol))
+                    result.Add(p);
+            }
+
+            // Handle the last point with the special rule
+            var last = list[list.Count - 1];
+
+            if (result.Count > 0)
+            {
+                var prev = result[result.Count - 1];
+
+                // If last is within tolerance of the previous kept point,
+                // drop the previous and keep the last instead.
+                if (last.DistanceTo(prev) <= tol)
+                {
+                    result[result.Count - 1] = last;
+                    return result;
+                }
+            }
+
+            // Otherwise, apply normal tolerance logic for the last point
+            if (!result.Any(q => last.DistanceTo(q) <= tol))
+                result.Add(last);
+
+            return result;
+        }
         public static Vector3d GetBrepNormalAtPoint(Brep brep, Point3d pt, double tol)
         {
             // Find closest point on the brep
