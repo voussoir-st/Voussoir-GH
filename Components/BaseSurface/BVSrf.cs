@@ -276,10 +276,25 @@ namespace VoussoirPlugin03.Components.BaseSurface
                 double dist0 = edges[arcIdx[0]].A.DistanceTo(edges[arcIdx[0]].B);
                 double dist1 = edges[arcIdx[1]].A.DistanceTo(edges[arcIdx[1]].B);
                 double minDist = Math.Min(dist0, dist1);
-                if (height > minDist / 2)
-                    height = minDist / 2;
-            }
 
+                double maxAllowed = minDist / 2.0;
+
+                if (height > maxAllowed)
+                {
+                    // Set message to notify user
+                    this.Message = $"Clamped H: \n{maxAllowed:0.###}";
+                    height = maxAllowed;
+                }
+                else
+                {
+                    // Clear message if no clamping occurred
+                    this.Message = "";
+                }
+            }
+            else
+            {
+                this.Message = "";
+            }
             // Build the two arc curves for the vault
             var arcs = new List<Curve>(2);
             foreach (int ei in arcIdx)

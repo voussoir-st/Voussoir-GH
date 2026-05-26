@@ -273,6 +273,7 @@ namespace VoussoirPlugin03.Components.Geometry
                     voussoirParts.Add(extradosSurface.ToBrep());
                     voussoirParts.Add(joinedCF[0]);
                     var voussoir = Brep.JoinBreps(voussoirParts, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
+                    if (!voussoir[0].IsSolid) AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Error: self intersecting voussoirs.\nSolve by reducing thickness.");
                     voussoirsTree.Append(new GH_Brep(voussoir[0]), path);
                 }
             }

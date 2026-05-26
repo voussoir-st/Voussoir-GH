@@ -24,14 +24,14 @@ namespace VoussoirPlugin03.Components.BaseSurface
         {
         }
         public override Guid ComponentGuid => new Guid("6335BBF4-5F06-4327-89F9-FFDE1C891A79");
-        //protected override System.Drawing.Bitmap Icon
-        //{
-        //    get
-        //    {
-        //        //Use the imported Resources class directly
-        //        return Resources.BVSrf;
-        //    }
-        //}
+        protected override System.Drawing.Bitmap Icon
+        {
+            get
+            {
+                //Use the imported Resources class directly
+                return Properties.Resources.GVSrf;
+            }
+        }
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddCurveParameter("Springer Lines", "L1", "set(s) of 2 non intersecting lines", GH_ParamAccess.list);
@@ -109,6 +109,29 @@ namespace VoussoirPlugin03.Components.BaseSurface
                 }
             }
 
+            if (mode == 0)
+            {
+                // Compute shortest span between the two springer pairs
+                double distA = springerLines[0].PointAtStart.DistanceTo(springerLines[1].PointAtStart);
+                double distB = springerLines2[0].PointAtStart.DistanceTo(springerLines2[1].PointAtStart);
+
+                double minDist = Math.Min(distA, distB);
+                double maxAllowed = minDist / 2.0;
+
+                if (height > maxAllowed)
+                {
+                    this.Message = $"Clamped H: \n{maxAllowed:0.###}";
+                    height = maxAllowed;
+                }
+                else
+                {
+                    this.Message = "";
+                }
+            }
+            else
+            {
+                this.Message = "";
+            }
             // Processar os dois conjuntos
             var result1 = ProcessSpringerPair(springerLines, height, spanDir, mode);
             var result2 = ProcessSpringerPair(springerLines2, height, spanDir, mode);

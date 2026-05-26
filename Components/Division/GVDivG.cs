@@ -25,13 +25,13 @@ namespace VoussoirPlugin03.Components.Division
 
         public override Guid ComponentGuid => new Guid("BC98E9F2-CD3B-4C41-ADFF-FD189794437C");
 
-        //protected override System.Drawing.Bitmap Icon
-        //{
-        //    get
-        //    {
-        //        return VoussoirPlugin03.Properties.Resources.VDiv;
-        //    }
-        //}
+        protected override System.Drawing.Bitmap Icon
+        {
+            get
+            {
+                return VoussoirPlugin03.Properties.Resources.GVDivG;
+            }
+        }
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
@@ -365,6 +365,7 @@ namespace VoussoirPlugin03.Components.Division
                             return t;
                         })
                         .ToList();
+                    if (new Vector3d(notCand[0].PointAtEnd - notCand[0].PointAtStart) * Vector3d.ZAxis < 0) notCand[0].Reverse();
 
                     foreach (var p in splitPlanes)
                     {
@@ -414,6 +415,12 @@ namespace VoussoirPlugin03.Components.Division
                              return t;
                          })
                          .ToList();
+
+                    if (UDiv % 2 == 0)
+                    {
+                        arcUpoints.Insert(UDiv / 2, arc.PointAtNormalizedLength(0.5));
+                        ncUpoints.Insert(UDiv / 2, notCand[0].PointAtEnd);
+                    }
 
                     //_previewCrvs.AddRange(ncUpoints.Select(a => new Point(a)));
 
@@ -490,8 +497,9 @@ namespace VoussoirPlugin03.Components.Division
                         
                         intUPoints1.Add(c1.PointAtEnd);
                         intUPoints2.Add(c2.PointAtEnd);
-                        intUPoints1 = BaseSurface.PolylineUtils.DistinctByTolerance(intUPoints1, 0.1);
-                        intUPoints2 = BaseSurface.PolylineUtils.DistinctByTolerance(intUPoints2, 0.1);
+                        double groinTol = 0.1;
+                        intUPoints1 = BaseSurface.PolylineUtils.DistinctByTolerance(intUPoints1, groinTol);
+                        intUPoints2 = BaseSurface.PolylineUtils.DistinctByTolerance(intUPoints2, groinTol);
 
                         if (intUPoints1.Count < intUPoints2.Count)
                         {
@@ -643,15 +651,15 @@ namespace VoussoirPlugin03.Components.Division
                                 // --- Preview ---
                                 //_previewCrvs.Add(new LineCurve(l1));
                                 //_previewCrvs.Add(new LineCurve(l2));
-                                _previewCrvs.Add(new LineCurve(l3));
-                                _previewCrvs.Add(new LineCurve(l4));
+                                //_previewCrvs.Add(new LineCurve(l3));
+                                //_previewCrvs.Add(new LineCurve(l4));
 
                                 // --- Final plane ---
                                 P2_3 = new Plane(ip2_3, new Vector3d(ip3 - ip2), nAvg);
                             }
 
                             //var srfpl1 = intPl1.PullToBrepFace(s.Faces[0], tol);
-                            //_previewCrvs.Add(intPl1.ToNurbsCurve());                           
+                            _previewCrvs.Add(intPl1.ToNurbsCurve());
                             //_previewBrep.Add(iPlane);
 
                             panelPlanesTree.Append(new GH_Plane(iPlane), new GH_Path(q, i));
