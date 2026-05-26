@@ -41,16 +41,7 @@ namespace VoussoirPlugin03.Components.Springers
             pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
             pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
             //pManager.AddPointParameter("Log", "p1", "All messages generated during execution", GH_ParamAccess.tree);
-            //pManager.AddPointParameter("Log", "p2", "All messages generated during execution", GH_ParamAccess.tree);
-            //pManager.AddPointParameter("Log", "p3", "All messages generated during execution", GH_ParamAccess.tree);
-            //pManager.AddCurveParameter("Voussoirs", "c1", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddCurveParameter("Voussoirs", "c2", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddCurveParameter("Voussoirs", "c3", "Non transformed voussoirs", GH_ParamAccess.tree);
-            //pManager.AddBrepParameter("Springers", "b1", "Finished Springers", GH_ParamAccess.tree);
-            //pManager.AddBrepParameter("Springers", "b2", "Finished Springers", GH_ParamAccess.tree);
-            //pManager.AddBrepParameter("Springers", "b3", "Finished Springers", GH_ParamAccess.tree);
-            //pManager.AddPlaneParameter("Springers", "pl1", "Finished Springers", GH_ParamAccess.tree);
-
+            
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -60,24 +51,14 @@ namespace VoussoirPlugin03.Components.Springers
             GH_Structure<GH_Brep> voussoirsTree = new GH_Structure<GH_Brep>();
             GH_Structure<GH_Plane> transPlanesTree = new GH_Structure<GH_Plane>();
 
-            if (!DA.GetDataTree(0, out surfacesTree)) ;
-            if (!DA.GetDataTree(1, out springerLinesTree)) ;
-            if (!DA.GetDataTree(2, out voussoirsTree)) ;
-            if (!DA.GetDataTree(3, out transPlanesTree)) ;
+            DA.GetDataTree(0, out surfacesTree);
+            DA.GetDataTree(1, out springerLinesTree);
+            DA.GetDataTree(2, out voussoirsTree);
+            DA.GetDataTree(3, out transPlanesTree);
 
             //Per Vault
             GH_Structure<GH_Brep> outspringers = new GH_Structure<GH_Brep>();
-            GH_Structure<GH_Brep> outvoussoirs = new GH_Structure<GH_Brep>();
-            GH_Structure<GH_Point> p1 = new GH_Structure<GH_Point>();
-            GH_Structure<GH_Point> p2 = new GH_Structure<GH_Point>();
-            GH_Structure<GH_Point> p3 = new GH_Structure<GH_Point>();
-            GH_Structure<GH_Curve> c1 = new GH_Structure<GH_Curve>();
-            GH_Structure<GH_Curve> c2 = new GH_Structure<GH_Curve>();
-            GH_Structure<GH_Curve> c3 = new GH_Structure<GH_Curve>();
-            GH_Structure<GH_Brep> b1 = new GH_Structure<GH_Brep>();
-            GH_Structure<GH_Brep> b2 = new GH_Structure<GH_Brep>();
-            GH_Structure<GH_Brep> b3 = new GH_Structure<GH_Brep>();
-            GH_Structure<GH_Plane> pl1 = new GH_Structure<GH_Plane>();
+            GH_Structure<GH_Brep> outvoussoirs = new GH_Structure<GH_Brep>();            
 
             foreach (GH_Path path in surfacesTree.Paths)
             {
@@ -361,9 +342,9 @@ namespace VoussoirPlugin03.Components.Springers
                 }
 
                 var Line20 = new Line(pts40[0], pts40.Last());
-                c1.Append(new GH_Curve(new LineCurve(Line20)));
+                //c1.Append(new GH_Curve(new LineCurve(Line20)));
                 var Line21 = new Line(pts41[0], pts41.Last());
-                c1.Append(new GH_Curve(new LineCurve(Line21)));
+                //c1.Append(new GH_Curve(new LineCurve(Line21)));
 
                 for (int i = 0; i < transPlanes.Count - 1; i++)
                 {
@@ -420,7 +401,7 @@ namespace VoussoirPlugin03.Components.Springers
                             for (int k = 0; k < 2; k++)
                             {
                                 var plane = transPlanes[i + k];
-                                pl1.Append(new GH_Plane(plane));
+                                //pl1.Append(new GH_Plane(plane));
                                 var intpointA = Intersection.CurvePlane(springerLines[1], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
 
                                 var transformIntrados = rowIntrados[0];
@@ -432,7 +413,6 @@ namespace VoussoirPlugin03.Components.Springers
 
                                 //Pt 1
                                 var pt1 = Intersection.CurvePlane(springerLines[0], transPlanes[i + k], RhinoMath.ZeroTolerance)[0].PointA;
-                                p1.Append(new GH_Point(pt1));
                                 //outspringers.Append(new GH_Point(pt1), path);
                                 //p1.Append(new GH_Point(pt1));
 
@@ -453,7 +433,7 @@ namespace VoussoirPlugin03.Components.Springers
                                     .OrderBy(p => p.Z)
                                     .First();
                                 //p3.Append(new GH_Point(lpoint));
-                                p2.Append(new GH_Point(lpoint));
+                                //p2.Append(new GH_Point(lpoint));
                                 var dirLine = new Line(pt3, lpoint);
                                 dirLine.Extend(300, 300);                                
 
@@ -462,7 +442,7 @@ namespace VoussoirPlugin03.Components.Springers
                                 Intersection.LinePlane(Line20, plane, out t);
                                 pt4 = Line20.PointAt(t);
 
-                                p3.Append(new GH_Point(pt4));
+                                //p3.Append(new GH_Point(pt4));
 
                                 //c1.Append(new GH_Curve(new LineCurve(dirLine)), path);
                                 //outspringers.Append(new GH_Point(pt4), path);
@@ -623,17 +603,7 @@ namespace VoussoirPlugin03.Components.Springers
                 }
             }
             DA.SetDataTree(0, outspringers);
-            DA.SetDataTree(1, outvoussoirs);
-            //DA.SetDataTree(2, p1);
-            //DA.SetDataTree(3, p2);
-            //DA.SetDataTree(4, p3);
-            //DA.SetDataTree(5, c1);
-            //DA.SetDataTree(6, c2);
-            //DA.SetDataTree(7, c3);
-            //DA.SetDataTree(8, b1);
-            //DA.SetDataTree(9, b2);
-            //DA.SetDataTree(10, b3);
-            //DA.SetDataTree(11, pl1);
+            DA.SetDataTree(1, outvoussoirs);            
         }
     }
 }

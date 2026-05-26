@@ -34,23 +34,16 @@ namespace VoussoirPlugin03.Components.Division
         }
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
-        {
-            // Now accepts a tree of surfaces
+        {            
             pManager.AddSurfaceParameter("Vault Surface", "S", "Surface(s) that define the vault. Provide as a tree where each branch corresponds to one vault (1 or multiple surfaces).", GH_ParamAccess.tree);
-            pManager.AddIntegerParameter(
-                "U Divisions", "U",
-                "Number of voussoir divisions along the U direction (Springer Lines direction)\nMinimum: 1",
-                GH_ParamAccess.tree, 8);
-
-            pManager.AddIntegerParameter(
-                "V Divisions", "V1",
-                "Number of voussoir divisions along the V direction (Profile direction)\nMinimum: 3",
-                GH_ParamAccess.tree, 12);
-
-            pManager.AddNumberParameter(
-                "V Divisions", "V2",
-                "Number of voussoir divisions along the V direction (Profile direction)\nMinimum: 3",
-                GH_ParamAccess.tree, 0.3);
+            
+            pManager.AddIntegerParameter("U Divisions", "U1", "Number of voussoir divisions along the U direction (Springer Lines direction)\nMinimum: 1", GH_ParamAccess.tree, 8);
+            
+            pManager.AddIntegerParameter("U Divisions", "U2", "Number of voussoir divisions along the V direction (Profile direction)\nMinimum: 3", GH_ParamAccess.tree, 8);
+            
+            pManager.AddIntegerParameter("V Divisions", "V", "Number of voussoir divisions along the V direction (Profile direction)\nMinimum: 3", GH_ParamAccess.tree, 12);
+            
+            pManager.AddNumberParameter("Division Tolerance", "T", "Minimum distance from the Groin line to the second closest voussoir.", GH_ParamAccess.tree, 0.1);
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -63,8 +56,8 @@ namespace VoussoirPlugin03.Components.Division
             pManager.AddPlaneParameter("U Planes", "Pu", "Division Planes with constant U-value.", GH_ParamAccess.list);
             pManager.HideParameter(3);
             pManager.AddGenericParameter("V Planes", "Pv", "Division Planes with constant V-value.", GH_ParamAccess.list);
-            //pManager.HideParameter(4);
-            pManager.AddGenericParameter("V Planes", "Pv", "Division Planes with constant V-value.", GH_ParamAccess.list);
+            pManager.HideParameter(4);
+            //pManager.AddGenericParameter("V Planes", "Pv", "Division Planes with constant V-value.", GH_ParamAccess.list);
         }
         //private List<Point3d> _previewPts = new List<Point3d>();
         //private List<Curve> _previewCrvs = new List<Curve>();
@@ -107,84 +100,109 @@ namespace VoussoirPlugin03.Components.Division
             var vaultTree = new GH_Structure<GH_Surface>();
             if (!DA.GetDataTree(0, out vaultTree)) return;
             // Read span and length divisions as trees
-            GH_Structure<GH_Integer> UTree;
-            GH_Structure<GH_Integer> VTree1;
-            GH_Structure<GH_Number> VTree2;
+            GH_Structure<GH_Integer> UTree1; 
+            GH_Structure<GH_Integer> UTree2; 
+            GH_Structure<GH_Integer> VTree;
 
-            DA.GetDataTree(1, out UTree);
-            DA.GetDataTree(2, out VTree1);
-            DA.GetDataTree(3, out VTree2);
+            DA.GetDataTree(1, out UTree1);
+            DA.GetDataTree(2, out UTree2);
+            DA.GetDataTree(3, out VTree);
+            GH_Structure<GH_Number> tolerances;
+            DA.GetDataTree(4, out tolerances);
+
+            List<double> tolFallback = new List<double>();
+            foreach (var p in tolerances.Paths)
+            {
+                foreach (var ghInt in tolerances[p])
+                    tolFallback.Add(ghInt.Value);
+            }
 
             // Flatten span fallback list
-            List<int> UFallback = new List<int>();
-            foreach (var p in UTree.Paths)
+            List<int> U1Fallback = new List<int>();
+            foreach (var p in UTree1.Paths)
             {
-                foreach (var ghInt in UTree[p])
-                    UFallback.Add(ghInt.Value);
+                foreach (var ghInt in UTree1[p])
+                    U1Fallback.Add(ghInt.Value);
             }
 
             // Flatten length fallback list
-            List<int> V1Fallback = new List<int>();
-            foreach (var p in VTree1.Paths)
+            List<int> U2Fallback = new List<int>();
+            foreach (var p in UTree2.Paths)
             {
-                foreach (var ghInt in VTree1[p])
-                    V1Fallback.Add(ghInt.Value);
+                foreach (var ghInt in UTree2[p])
+                    U2Fallback.Add(ghInt.Value);
             }
-            List<int> V2Fallback = new List<int>();
-            foreach (var p in VTree1.Paths)
+            List<int> VFallback = new List<int>();
+            foreach (var p in VTree.Paths)
             {
-                foreach (var ghInt in VTree1[p])
-                    V2Fallback.Add(ghInt.Value);
+                foreach (var ghInt in VTree[p])
+                    VFallback.Add(ghInt.Value);
             }
+
             int q = 0;
             foreach (GH_Path branchPath in vaultTree.Paths)
             {
                 // Default values
-                int UDiv = 12;
-                int VDiv1 = 8;
-                double VDiv2 = 0.3;
+                int U1Div = 12;
+                int U2Div = 12;
+                int VDiv = 8;
+                double groinTol = 0.1;
 
                 // 1) Exact path match (preferred)
-                if (UTree.PathExists(branchPath) && UTree[branchPath].Count > 0)
-                    UDiv = UTree[branchPath][0].Value;
+                if (tolerances.PathExists(branchPath) && tolerances[branchPath].Count > 0)
+                    groinTol = tolerances[branchPath][0].Value;
 
                 // 2) Else try to match by branch index (last index of the path)
                 else
                 {
                     int branchIndex = (branchPath.Indices.Length > 0) ? branchPath.Indices[branchPath.Indices.Length - 1] : 0;
-                    if (UFallback.Count > branchIndex)
-                        UDiv = UFallback[branchIndex];
-                    else if (UFallback.Count > 0)
-                        UDiv = UFallback[0]; // broadcast first value
+                    if (tolFallback.Count > branchIndex)
+                        groinTol = tolFallback[branchIndex];
+                    else if (tolFallback.Count > 0)
+                        groinTol = tolFallback[0]; // broadcast first value
+                }
+
+                // 1) Exact path match (preferred)
+                if (UTree1.PathExists(branchPath) && UTree1[branchPath].Count > 0)
+                    U1Div = UTree1[branchPath][0].Value;
+
+                // 2) Else try to match by branch index (last index of the path)
+                else
+                {
+                    int branchIndex = (branchPath.Indices.Length > 0) ? branchPath.Indices[branchPath.Indices.Length - 1] : 0;
+                    if (U1Fallback.Count > branchIndex)
+                        U1Div = U1Fallback[branchIndex];
+                    else if (U1Fallback.Count > 0)
+                        U1Div = U1Fallback[0]; // broadcast first value
                 }
 
                 // Same for length
-                if (VTree1.PathExists(branchPath) && VTree1[branchPath].Count > 0)
-                    VDiv1 = VTree1[branchPath][0].Value;
+                if (UTree2.PathExists(branchPath) && UTree2[branchPath].Count > 0)
+                    U2Div = UTree1[branchPath][0].Value;
                 else
                 {
                     int branchIndex = (branchPath.Indices.Length > 0) ? branchPath.Indices[branchPath.Indices.Length - 1] : 0;
-                    if (V1Fallback.Count > branchIndex)
-                        VDiv1 = V1Fallback[branchIndex];
-                    else if (V1Fallback.Count > 0)
-                        VDiv1 = V1Fallback[0];
+                    if (U2Fallback.Count > branchIndex)
+                        U2Div = U2Fallback[branchIndex];
+                    else if (U2Fallback.Count > 0)
+                        U2Div = U2Fallback[0];
                 }
                 // Same for length
-                if (VTree2.PathExists(branchPath) && VTree2[branchPath].Count > 0)
-                    VDiv2 = VTree2[branchPath][0].Value;
+                if (VTree.PathExists(branchPath) && VTree[branchPath].Count > 0)
+                    VDiv = VTree[branchPath][0].Value;
                 else
                 {
                     int branchIndex = (branchPath.Indices.Length > 0) ? branchPath.Indices[branchPath.Indices.Length - 1] : 0;
-                    if (V2Fallback.Count > branchIndex)
-                        VDiv2 = V2Fallback[branchIndex];
-                    else if (V2Fallback.Count > 0)
-                        VDiv2 = V2Fallback[0];
+                    if (VFallback.Count > branchIndex)
+                        VDiv = VFallback[branchIndex];
+                    else if (VFallback.Count > 0)
+                        VDiv = VFallback[0];
                 }
 
                 // Clamp values
-                if (UDiv < 3) UDiv = 3;
-                if (VDiv1 < 1) VDiv1 = 1;
-                if (VDiv2 < 1) VDiv2 = 1;
+                if (U1Div < 1) U1Div = 1;
+                if (U2Div < 1) U2Div = 1;
+                if (VDiv < 3) VDiv = 3;
 
                 // collect surfaces in this branch
                 List<Brep> breps = new List<Brep>();
@@ -323,7 +341,7 @@ namespace VoussoirPlugin03.Components.Division
                 var arcLongest = arcs.OrderByDescending(l => l.GetLength()).First();
 
                 Point3d[] UintPoints;
-                arcLongest.DivideByCount(UDiv, true, out UintPoints);
+                arcLongest.DivideByCount(VDiv, true, out UintPoints);
 
                 //intPoints.Select(p => new Point(p))
                 //    .ToList()
@@ -350,6 +368,8 @@ namespace VoussoirPlugin03.Components.Division
                 {
                     var surfaceBoundaries = new List<String>();
                     var vaultdivisionPlanesTree = new List<Plane>();
+                    var uPlanestree = new List<Plane>();
+                    var vPlanestree = new List<Plane>();
                     var surf = s.Faces[0].UnderlyingSurface();
                     var sAlign = BaseSurface.PolylineUtils.AlignNormalToWorldZ(surf);
                     //Debug.WriteLine($"\nvault: {i}");
@@ -416,10 +436,10 @@ namespace VoussoirPlugin03.Components.Division
                          })
                          .ToList();
 
-                    if (UDiv % 2 == 0)
+                    if (VDiv % 2 == 0)
                     {
-                        arcUpoints.Insert(UDiv / 2, arc.PointAtNormalizedLength(0.5));
-                        ncUpoints.Insert(UDiv / 2, notCand[0].PointAtEnd);
+                        arcUpoints.Insert(VDiv / 2, arc.PointAtNormalizedLength(0.5));
+                        ncUpoints.Insert(VDiv / 2, notCand[0].PointAtEnd);
                     }
 
                     //_previewCrvs.AddRange(ncUpoints.Select(a => new Point(a)));
@@ -462,7 +482,8 @@ namespace VoussoirPlugin03.Components.Division
 
                     if (- tol > Vplane.DistanceTo(CrvLongest.PointAtStart) || Vplane.DistanceTo(CrvLongest.PointAtStart) > tol) CrvLongest.Reverse();
 
-                    CrvLongest.DivideByCount(VDiv1, true, out V1intPoints);
+                    if (Params.Input[2].SourceCount > 0 && i == 2 || i== 3) CrvLongest.DivideByCount(U2Div, true, out V1intPoints);
+                    else CrvLongest.DivideByCount(U1Div, true, out V1intPoints);
 
                     //_previewBrep.Add(CrvLongest);
 
@@ -497,7 +518,7 @@ namespace VoussoirPlugin03.Components.Division
                         
                         intUPoints1.Add(c1.PointAtEnd);
                         intUPoints2.Add(c2.PointAtEnd);
-                        double groinTol = 0.1;
+                        
                         intUPoints1 = BaseSurface.PolylineUtils.DistinctByTolerance(intUPoints1, groinTol);
                         intUPoints2 = BaseSurface.PolylineUtils.DistinctByTolerance(intUPoints2, groinTol);
 
@@ -597,7 +618,7 @@ namespace VoussoirPlugin03.Components.Division
                             var intPl1 = new PolylineCurve(ipPoints1);
                             if (k == intUPoints1.Count - 2 && j != ULines.Count / 2 - 1)
                             {
-                                Debug.WriteLine("true");
+                                //Debug.WriteLine("true");
 
                                 if (breps.Count < 2)
                                     return;
@@ -668,12 +689,19 @@ namespace VoussoirPlugin03.Components.Division
                             boundaries.Append(new GH_String($"B{{{count};{count + 1};{count + 2};{count + 3}}}"), new GH_Path(q, i));
 
                             vaultdivisionPlanesTree.Add(P1_2);
+                            uPlanestree.Add(P1_2);
                             vaultdivisionPlanesTree.Add(P2_3);
+                            
                             vaultdivisionPlanesTree.Add(P3_4);
-                            vaultdivisionPlanesTree.Add(P4_1);                            
+                            if (j == ULines.Count - 2) uPlanestree.Add(P3_4);
+                            vaultdivisionPlanesTree.Add(P4_1);
+                            vPlanestree.Add(P4_1);
+                            if (k == intUPoints1.Count - 2) vPlanestree.Add(P2_3);
                         }
                     }
                     divisionPlanesTree.AppendRange(vaultdivisionPlanesTree.Select(p => new GH_Plane(p)), new GH_Path(q, i));
+                    transversalPlanesTree.AppendRange(vPlanestree.Select(p => new GH_Plane(p)), new GH_Path(q, i));
+                    longitudinalPlanesTree.AppendRange(uPlanestree.Select(p => new GH_Plane(p)), new GH_Path(q, i));
                     i++;
 
 
@@ -683,8 +711,9 @@ namespace VoussoirPlugin03.Components.Division
             DA.SetDataTree(0, panelPlanesTree);
             DA.SetDataTree(1, divisionPlanesTree);
             DA.SetDataTree(2, boundaries);
-            DA.SetDataList(4, _previewCrvs);
-            DA.SetDataList(5, _previewBrep);            
+            DA.SetDataTree(3, transversalPlanesTree);
+            DA.SetDataList(4, longitudinalPlanesTree);
+            //DA.SetDataList(5, _previewBrep);            
         }
     }
 }

@@ -1,6 +1,8 @@
 ﻿using Grasshopper.Kernel;
+using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Parameters;
 using Grasshopper.Kernel.Special;
+using Grasshopper.Kernel.Types;
 using Rhino;
 using Rhino.Geometry;
 using Rhino.Geometry.Intersect;
@@ -13,6 +15,7 @@ namespace VoussoirPlugin03.Components.BaseSurface
 {
     public class GroinVaultDefiningCurves : GH_Component
     {
+
         public GroinVaultDefiningCurves()
           : base(
             "Groin Vault Base Surface",
@@ -21,7 +24,7 @@ namespace VoussoirPlugin03.Components.BaseSurface
             "Voussoir",
             "Base Surface"
           )
-        {
+        {                
         }
         public override Guid ComponentGuid => new Guid("6335BBF4-5F06-4327-89F9-FFDE1C891A79");
         protected override System.Drawing.Bitmap Icon
@@ -34,8 +37,8 @@ namespace VoussoirPlugin03.Components.BaseSurface
         }
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddCurveParameter("Springer Lines", "L1", "set(s) of 2 non intersecting lines", GH_ParamAccess.list);
-            pManager.AddCurveParameter("Springer Lines", "L2", "set(s) of 2 non intersecting lines", GH_ParamAccess.list);
+            pManager.AddCurveParameter("Springer Lines 1", "L1", "First set(s) of 2 non intersecting lines", GH_ParamAccess.list);
+            pManager.AddCurveParameter("Springer Lines 2", "L2", "Second set(s) of 2 non intersecting lines", GH_ParamAccess.list);
             pManager.AddNumberParameter("Vault Height", "H", "Arc's Height.", GH_ParamAccess.item, 2.0);
             //pManager.AddBooleanParameter("Span Direction", "SpanDirection", "0 = arcs on sides 0-1 and 2-3; 1 = arcs on sides 1-2 and 3-0.", GH_ParamAccess.item, true);
             pManager.AddIntegerParameter("Arc Profile", "A",
@@ -71,8 +74,14 @@ namespace VoussoirPlugin03.Components.BaseSurface
                 args.Display.DrawPoint(pt, Rhino.Display.PointStyle.RoundSimple, 3, System.Drawing.Color.DarkRed);
             }
         }
-        protected override void SolveInstance(IGH_DataAccess DA)
+
+        static int vaultIndex = 0;
+        protected override void BeforeSolveInstance()
         {
+            vaultIndex = 0;
+        }
+        protected override void SolveInstance(IGH_DataAccess DA)
+        {                        
             double tol = 0.0001;
             //_previewPts.Clear();
             // Declare input variables
@@ -178,12 +187,12 @@ namespace VoussoirPlugin03.Components.BaseSurface
             surfaces2.Add(result4.loft);
 
             List<Curve> lines2 = new List<Curve>();
-            if (result3.lines[0].PointAtStart.DistanceTo(result3.lines[1].PointAtEnd) < result3.lines[0].PointAtStart.DistanceTo(result3.lines[1].PointAtStart)) ;
+            if (result3.lines[0].PointAtStart.DistanceTo(result3.lines[1].PointAtEnd) < result3.lines[0].PointAtStart.DistanceTo(result3.lines[1].PointAtStart))
             {
                 result3.lines[1].Reverse();
             }
             lines2.AddRange(result3.lines);
-            if (result4.lines[0].PointAtStart.DistanceTo(result4.lines[1].PointAtEnd) < result4.lines[0].PointAtStart.DistanceTo(result4.lines[1].PointAtStart)) ;
+            if (result4.lines[0].PointAtStart.DistanceTo(result4.lines[1].PointAtEnd) < result4.lines[0].PointAtStart.DistanceTo(result4.lines[1].PointAtStart))
             {
                 result4.lines[1].Reverse();
             }
@@ -502,18 +511,94 @@ namespace VoussoirPlugin03.Components.BaseSurface
             var SB2closestBrep = splitSurfaceB
                 .OrderBy(b => b.ClosestPoint(SB2midpoint).DistanceTo(SB2midpoint))
                 .First();
-
             List<Brep> trimmedSurfaces = new List<Brep>();
+            int q = 0;
+            GH_Structure <GH_Brep> trimmedSurfacesTree = new GH_Structure<GH_Brep>();
+            trimmedSurfacesTree.Append(new GH_Brep(SA1closestBrep), new GH_Path(vaultIndex));
             trimmedSurfaces.Add(SA1closestBrep);
+            q++;
+            trimmedSurfacesTree.Append(new GH_Brep(SA2closestBrep), new GH_Path(vaultIndex));
             trimmedSurfaces.Add(SA2closestBrep);
+            q++;
+            trimmedSurfacesTree.Append(new GH_Brep(SB1closestBrep), new GH_Path(vaultIndex));
             trimmedSurfaces.Add(SB1closestBrep);
+            q++;
+            trimmedSurfacesTree.Append(new GH_Brep(SB2closestBrep), new GH_Path(vaultIndex));
             trimmedSurfaces.Add(SB2closestBrep);
+            q++;
 
+            GH_Structure<GH_Curve> sls = new GH_Structure<GH_Curve>();
+            int n = 0;
+            foreach (var s in trimmedSurfaces)
+            {                
+                var srfEdges = s.Edges;              
+
+                Curve[] joined = Curve.JoinCurves(srfEdges, tol);
+
+                if (joined == null || joined.Length == 0)
+                    continue;
+
+                Curve boundary = joined[0];  
+                
+                List<Point3d> vertices = new List<Point3d>();
+
+                if (boundary is PolyCurve poly)
+                {
+                    foreach (Curve seg in poly.Explode())
+                    {
+                        vertices.Add(seg.PointAtStart);
+                        vertices.Add(seg.PointAtEnd);
+                    }
+                }
+                else
+                {
+                    vertices.Add(boundary.PointAtStart);
+                    vertices.Add(boundary.PointAtEnd);
+                }
+
+                vertices = vertices.Distinct().ToList();
+
+                var lowest4 = vertices
+                    .OrderBy(pt => pt.Z)
+                    .Take(4)
+                    .ToList();
+
+                Plane basePl;
+                Plane.FitPlaneToPoints(lowest4, out basePl);
+                if (basePl.ZAxis * Plane.WorldXY.ZAxis < 0)
+                {
+                    basePl.Flip();
+                }
+
+                int k = 0;
+                foreach (var edge in srfEdges)
+                {
+                    k++;
+                    bool endpointsOnPlane =
+                        basePl.DistanceTo(edge.PointAtStart) <= tol &&
+                        basePl.DistanceTo(edge.PointAtEnd) <= tol;
+                    if (!endpointsOnPlane) continue;                    
+
+                    double midDist = basePl.DistanceTo(edge.PointAtNormalizedLength(0.5));
+                    if (midDist > tol)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        sls.Append(new GH_Curve(edge.ToNurbsCurve()), new GH_Path(vaultIndex, n));
+                    }
+                }
+                n++;
+            }
+            //trimmedSurfacesTree.Graft(false);
             // Output das superfícies
-            DA.SetDataList(0, trimmedSurfaces);
-            DA.SetDataList(1, lines2);
+            DA.SetDataTree(0, trimmedSurfacesTree);
+            DA.SetDataTree(1, sls);
             DA.SetDataList(2, ic);
+            vaultIndex++;
         }
+        //static solveCount = 0;
         Curve EnsureEndClosestToApex(Curve c, Point3d apex)
         {
             double dStart = c.PointAtStart.DistanceTo(apex);

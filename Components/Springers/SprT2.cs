@@ -56,10 +56,10 @@ namespace VoussoirPlugin03.Components.Springers
             GH_Structure<GH_Brep> voussoirsTree = new GH_Structure<GH_Brep>();
             GH_Structure<GH_Plane> transPlanesTree = new GH_Structure<GH_Plane>();
 
-            if (!DA.GetDataTree(0, out surfacesTree)) ;
-            if (!DA.GetDataTree(1, out springerLinesTree)) ;
-            if (!DA.GetDataTree(2, out voussoirsTree)) ;
-            if (!DA.GetDataTree(3, out transPlanesTree)) ;
+            DA.GetDataTree(0, out surfacesTree);
+            DA.GetDataTree(1, out springerLinesTree);
+            DA.GetDataTree(2, out voussoirsTree);
+            DA.GetDataTree(3, out transPlanesTree);
 
             //Per Vault
             GH_Structure<GH_Brep> outspringers = new GH_Structure<GH_Brep>();

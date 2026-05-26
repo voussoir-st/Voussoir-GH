@@ -1,4 +1,5 @@
-﻿using Grasshopper.Kernel;
+﻿using Eto.Forms;
+using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino;
@@ -273,7 +274,7 @@ namespace VoussoirPlugin03.Components.Geometry
                     voussoirParts.Add(extradosSurface.ToBrep());
                     voussoirParts.Add(joinedCF[0]);
                     var voussoir = Brep.JoinBreps(voussoirParts, RhinoDoc.ActiveDoc.ModelAbsoluteTolerance);
-                    if (!voussoir[0].IsSolid) AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Error: self intersecting voussoirs.\nSolve by reducing thickness.");
+                    if (!voussoir[0].IsSolid) AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Error: self intersecting voussoirs. \nSolve by increasing Division Tolerance (T) in the \"Groin Vault Division - Grid\" component.");
                     voussoirsTree.Append(new GH_Brep(voussoir[0]), path);
                 }
             }
