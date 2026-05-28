@@ -81,6 +81,28 @@ namespace VoussoirPlugin03.Components.Division
         //            args.Display.DrawCurve(crv, System.Drawing.Color.DarkRed, 2);
         //    }
         //}
+        private GH_Path TrimLastIndex(GH_Path p)
+        {
+            int[] indices = p.Indices;
+            if (indices.Length == 0)
+                return p;
+
+            int[] trimmed = indices.Take(indices.Length - 1).ToArray();
+            return new GH_Path(trimmed);
+        }
+
+        public GH_Structure<T> TrimLastLevel<T>(GH_Structure<T> tree) where T : IGH_Goo
+        {
+            GH_Structure<T> trimmed = new GH_Structure<T>();
+
+            foreach (GH_Path p in tree.Paths)
+            {
+                GH_Path newPath = TrimLastIndex(p);
+                trimmed.AppendRange(tree[p], newPath);
+            }
+
+            return trimmed;
+        }
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
@@ -97,8 +119,8 @@ namespace VoussoirPlugin03.Components.Division
             List<GeometryBase> _previewCrvs = new List<GeometryBase>();
 
             double tol = 0.0001;
-            var vaultTree = new GH_Structure<GH_Surface>();
-            if (!DA.GetDataTree(0, out vaultTree)) return;
+            var vaultTree1 = new GH_Structure<GH_Surface>();
+            if (!DA.GetDataTree(0, out vaultTree1)) return;
             // Read span and length divisions as trees
             GH_Structure<GH_Integer> UTree1; 
             GH_Structure<GH_Integer> UTree2; 
@@ -109,6 +131,8 @@ namespace VoussoirPlugin03.Components.Division
             DA.GetDataTree(3, out VTree);
             GH_Structure<GH_Number> tolerances;
             DA.GetDataTree(4, out tolerances);
+
+            var vaultTree = TrimLastLevel(vaultTree1);
 
             List<double> tolFallback = new List<double>();
             foreach (var p in tolerances.Paths)
@@ -712,7 +736,7 @@ namespace VoussoirPlugin03.Components.Division
             DA.SetDataTree(1, divisionPlanesTree);
             DA.SetDataTree(2, boundaries);
             DA.SetDataTree(3, transversalPlanesTree);
-            DA.SetDataList(4, longitudinalPlanesTree);
+            DA.SetDataTree(4, longitudinalPlanesTree);
             //DA.SetDataList(5, _previewBrep);            
         }
     }

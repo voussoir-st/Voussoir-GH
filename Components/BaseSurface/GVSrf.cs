@@ -514,16 +514,16 @@ namespace VoussoirPlugin03.Components.BaseSurface
             List<Brep> trimmedSurfaces = new List<Brep>();
             int q = 0;
             GH_Structure <GH_Brep> trimmedSurfacesTree = new GH_Structure<GH_Brep>();
-            trimmedSurfacesTree.Append(new GH_Brep(SA1closestBrep), new GH_Path(vaultIndex));
+            trimmedSurfacesTree.Append(new GH_Brep(SA1closestBrep), new GH_Path(vaultIndex, q));
             trimmedSurfaces.Add(SA1closestBrep);
             q++;
-            trimmedSurfacesTree.Append(new GH_Brep(SA2closestBrep), new GH_Path(vaultIndex));
+            trimmedSurfacesTree.Append(new GH_Brep(SA2closestBrep), new GH_Path(vaultIndex, q));
             trimmedSurfaces.Add(SA2closestBrep);
             q++;
-            trimmedSurfacesTree.Append(new GH_Brep(SB1closestBrep), new GH_Path(vaultIndex));
+            trimmedSurfacesTree.Append(new GH_Brep(SB1closestBrep), new GH_Path(vaultIndex, q));
             trimmedSurfaces.Add(SB1closestBrep);
             q++;
-            trimmedSurfacesTree.Append(new GH_Brep(SB2closestBrep), new GH_Path(vaultIndex));
+            trimmedSurfacesTree.Append(new GH_Brep(SB2closestBrep), new GH_Path(vaultIndex, q));
             trimmedSurfaces.Add(SB2closestBrep);
             q++;
 
