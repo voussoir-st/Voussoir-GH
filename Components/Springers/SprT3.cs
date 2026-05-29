@@ -8,30 +8,28 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 using VoussoirPlugin03.Components.BaseSurface;
 
 namespace VoussoirPlugin03.Components.Springers
 {
-    public class SprTri01 : GH_Component
+    public class VoussoirCreate1 : GH_Component
     {
-        public SprTri01()
-            : base("Springer - Triangle", "SprTri",
-                  "Create a simple triangle Springer",
+        public VoussoirCreate1()
+            : base("Springer - Trapezoid", "SprT",
+                  "Create a simple trapezoid Springer",
                   "Voussoir", "Springer")
         { }
 
-        public override Guid ComponentGuid => new Guid("C78F9F2C-D3B4-C41A-DFFD-189794137C00");
+        public override Guid ComponentGuid => new Guid("FC88F9F2-CD3B-4C41-ADFF-FD189794137C");
 
-        protected override System.Drawing.Bitmap Icon => VoussoirPlugin03.Properties.Resources.SprTri;
+        protected override System.Drawing.Bitmap Icon => VoussoirPlugin03.Properties.Resources.SpringerT;
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddBrepParameter("Vault Surface", "S", "Surface that defines the vault", GH_ParamAccess.tree);
             pManager.AddCurveParameter("Springer Line", "L", "List of base lines to create vault springers", GH_ParamAccess.tree);
             pManager.AddBrepParameter("Voussoirs", "V", "Voussoirs to analyse", GH_ParamAccess.tree);
+            //pManager.AddPlaneParameter("U Planes", "Pu", "Division Planes with constant U-value.", GH_ParamAccess.tree);
             //pManager.AddNumberParameter("Springer Width", "SpringerWidth", "Distance perpendicular to springer line", GH_ParamAccess.item, 0.3);
         }
 
@@ -40,7 +38,15 @@ namespace VoussoirPlugin03.Components.Springers
             pManager.AddBrepParameter("Springers", "S", "Finished Springers", GH_ParamAccess.tree);
             pManager.AddBrepParameter("Voussoirs", "V", "Non transformed voussoirs", GH_ParamAccess.tree);
             //pManager.AddPointParameter("Log", "p1", "All messages generated during execution", GH_ParamAccess.tree);
-            
+            //pManager.AddPointParameter("Log", "p2", "All messages generated during execution", GH_ParamAccess.tree);
+            //pManager.AddPointParameter("Log", "p3", "All messages generated during execution", GH_ParamAccess.tree);
+            //pManager.AddCurveParameter("Voussoirs", "c1", "Non transformed voussoirs", GH_ParamAccess.tree);
+            //pManager.AddCurveParameter("Voussoirs", "c2", "Non transformed voussoirs", GH_ParamAccess.tree);
+            //pManager.AddCurveParameter("Voussoirs", "c3", "Non transformed voussoirs", GH_ParamAccess.tree);
+            //pManager.AddBrepParameter("Springers", "b1", "Finished Springers", GH_ParamAccess.tree);
+            //pManager.AddBrepParameter("Springers", "b2", "Finished Springers", GH_ParamAccess.tree);
+            //pManager.AddBrepParameter("Springers", "b3", "Finished Springers", GH_ParamAccess.tree);
+
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -56,7 +62,7 @@ namespace VoussoirPlugin03.Components.Springers
             //Per Vault
             GH_Structure<GH_Brep> outspringers = new GH_Structure<GH_Brep>();
             GH_Structure<GH_Brep> outvoussoirs = new GH_Structure<GH_Brep>();
-            outvoussoirs = voussoirsTree;
+
             foreach (GH_Path path in surfacesTree.Paths)
             {
                 Brep surface = surfacesTree[path][0].Value;
@@ -77,11 +83,13 @@ namespace VoussoirPlugin03.Components.Springers
                 // 2️⃣ Compute the centroid of each Brep
                 List<Point3d> centroids = voussoirs
                     .Select(v =>
-                    {                       
+                    {
                         var amp = v.GetBoundingBox(true).Center;
                         return amp;
                     })
                     .ToList();
+
+                List<Brep> restvoussoirs = new List<Brep>();
 
                 // 3️⃣ Compute the average of all centroids → epicenter
                 Point3d epicenter = new Point3d(
@@ -97,7 +105,7 @@ namespace VoussoirPlugin03.Components.Springers
 
                 double maxSize = 0;
                 foreach (var b in voussoirs)
-                {                    
+                {
                     var bBBox = b.GetBoundingBox(true);
                     var voussSize = bBBox.Diagonal.Length;
 
@@ -110,7 +118,7 @@ namespace VoussoirPlugin03.Components.Springers
                 for (int i = 0; i < springerLines.Count; i++)
                 {
                     var l = springerLines[i];
-                    List<Brep> selectedVoussoirs = new List<Brep>();                    
+                    List<Brep> selectedVoussoirs = new List<Brep>();
 
                     for (int j = 0; j < voussoirs.Count; j++)
                     {
@@ -118,13 +126,13 @@ namespace VoussoirPlugin03.Components.Springers
                         double t;
                         l.ClosestPoint(b, out t);
                         var lp = l.PointAt(t);
-                        var dist = lp.DistanceTo(b);                        
+                        var dist = lp.DistanceTo(b);
 
                         if (dist < maxSize / 2)
                         {
                             selectedVoussoirs.Add(voussoirs[j]);
                         }
-                    }                   
+                    }
 
                     List<Brep> closestVoussoirs = new List<Brep>();
 
@@ -158,13 +166,26 @@ namespace VoussoirPlugin03.Components.Springers
                         if (isclosest) closestVoussoirs.Add(selectedVoussoirs[j]);
                     }
 
+                    if (i == 0)
+                    {
+                        restvoussoirs = voussoirs
+                            .Skip(closestVoussoirs.Count)
+                            .ToList();
+                    }
+                    else if (i == 1)
+                    {
+                        restvoussoirs = restvoussoirs
+                            .Take(restvoussoirs.Count - closestVoussoirs.Count)
+                            .ToList();
+                    }
+
                     for (int j = 0; j < closestVoussoirs.Count; j++)
                     {
                         var b = closestVoussoirs[j];
                         var bCenter = b.GetBoundingBox(true).Center;
 
                         double u, v;
-                        alignedsurface.ClosestPoint(bCenter, out u, out v);                        
+                        alignedsurface.ClosestPoint(bCenter, out u, out v);
                         Vector3d srfNormal = alignedsurface.NormalAt(u, v);
                         srfNormal.Unitize();
                         var cPlane = new Plane(bCenter, srfNormal);
@@ -195,10 +216,10 @@ namespace VoussoirPlugin03.Components.Springers
                         List<Point3d> exVL = exVertices.Take(exHalf).ToList();
                         List<Point3d> exVH = exVertices.Skip(exHalf).ToList();
 
-                        inVL = SortByLine(inVL, l);
-                        inVH = SortByLine(inVH, l);
-                        exVL = SortByLine(exVL, l);
-                        exVH = SortByLine(exVH, l);
+                        inVL = SprTri01.SortByLine(inVL, l);
+                        inVH = SprTri01.SortByLine(inVH, l);
+                        exVL = SprTri01.SortByLine(exVL, l);
+                        exVH = SprTri01.SortByLine(exVH, l);
 
                         List<Point3d> face0 = new List<Point3d>();
                         List<Point3d> face1 = new List<Point3d>();
@@ -219,52 +240,64 @@ namespace VoussoirPlugin03.Components.Springers
                         Plane.FitPlaneToPoints(face1, out face1Plane);
 
                         // Face 0
-                            // Pt1
+                        // Pt1
                         var e0 = Intersection.CurvePlane(l, face0Plane, 0.1);
                         var pt1f0 = e0[0].PointA;
                         double u1, v1;
                         face0Plane.ClosestParameter(pt1f0, out u1, out v1);
                         pt1f0 = face0Plane.PointAt(u1, v1);
 
-                            // Pt2
-                        var pt2f0 = exVL[0];
+                        // Pt2
+                        var pt2f0 = inVH[0];
                         double u2, v2;
                         face0Plane.ClosestParameter(pt2f0, out u2, out v2);
                         pt2f0 = face0Plane.PointAt(u2, v2);
 
-                            // Pt3
+                        // Pt3
+                        var pt3f0 = exVH[0];
+                        double u21, v21;
+                        face0Plane.ClosestParameter(pt3f0, out u21, out v21);
+                        pt3f0 = face0Plane.PointAt(u21, v21);
+
+                        // Pt4
                         double z0;
                         var edge0 = new Line(exVH[0], exVL[0]);
                         edge0.Extend(0, maxSize * 10);
-                        var e1 = Intersection.LinePlane(edge0, pl0, out z0);                        
-                        var pt3f0 = edge0.PointAt(z0);
+                        var e1 = Intersection.LinePlane(edge0, pl0, out z0);
+                        var pt4f0 = edge0.PointAt(z0);
                         double u3, v3;
-                        face0Plane.ClosestParameter(pt3f0, out u3, out v3);
-                        pt3f0 = face0Plane.PointAt(u3, v3);
+                        face0Plane.ClosestParameter(pt4f0, out u3, out v3);
+                        pt4f0 = face0Plane.PointAt(u3, v3);
 
                         // Face 1
-                            // Pt1
+                        // Pt1
                         var e2 = Intersection.CurvePlane(l, face1Plane, 0.1);
                         var pt1f1 = e2[0].PointA;
                         double u4, v4;
                         face1Plane.ClosestParameter(pt1f1, out u4, out v4);
                         pt1f1 = face1Plane.PointAt(u4, v4);
-    
-                            // Pt2
-                        var pt2f1 = exVL[1];
+
+                        // Pt2
+                        var pt2f1 = inVH[1];
                         double u5, v5;
                         face1Plane.ClosestParameter(pt2f1, out u5, out v5);
                         pt2f1 = face1Plane.PointAt(u5, v5);
 
-                            // Pt3
+                        // Pt3
+                        var pt3f1 = exVH[1];
+                        double u51, v51;
+                        face1Plane.ClosestParameter(pt3f1, out u51, out v51);
+                        pt3f1 = face1Plane.PointAt(u51, v51);
+
+                        // Pt4
                         double z1;
                         var edge1 = new Line(exVH[1], exVL[1]);
                         edge1.Extend(0, maxSize * 10);
                         var e3 = Intersection.LinePlane(edge1, pl0, out z1);
-                        var pt3f1 = edge1.PointAt(z1);
+                        var pt4f1 = edge1.PointAt(z1);
                         double u6, v6;
-                        face1Plane.ClosestParameter(pt3f1, out u6, out v6);
-                        pt3f1 = face1Plane.PointAt(u6, v6);
+                        face1Plane.ClosestParameter(pt4f1, out u6, out v6);
+                        pt4f1 = face1Plane.PointAt(u6, v6);
 
 
                         // Build springer faces
@@ -274,11 +307,13 @@ namespace VoussoirPlugin03.Components.Springers
                         face0springer.Add(pt1f0);
                         face0springer.Add(pt2f0);
                         face0springer.Add(pt3f0);
+                        face0springer.Add(pt4f0);
                         face0springer.Add(pt1f0);
 
                         face1springer.Add(pt1f1);
                         face1springer.Add(pt2f1);
                         face1springer.Add(pt3f1);
+                        face1springer.Add(pt4f1);
                         face1springer.Add(pt1f1);
 
                         var face0polyline = new Polyline(face0springer);
@@ -319,22 +354,10 @@ namespace VoussoirPlugin03.Components.Springers
                     //outspringers.AppendRange(closestVoussoirs.Select(p => new GH_Brep(p)));
                 }
 
+                outvoussoirs.AppendRange(restvoussoirs.Select(p => new GH_Brep(p)), path);
             }
             DA.SetDataTree(0, outspringers);
             DA.SetDataTree(1, outvoussoirs);
-        }
-        public static List<Point3d> SortByLine(List<Point3d> pts, Curve line)
-        {
-            return pts
-                .Select(p =>
-                {
-                    double t;
-                    line.ClosestPoint(p, out t);
-                    return new { P = p, T = t };
-                })
-                .OrderBy(x => x.T)
-                .Select(x => x.P)
-                .ToList();
         }
     }
 }

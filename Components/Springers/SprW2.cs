@@ -267,7 +267,7 @@ namespace VoussoirPlugin03.Components.Springers
     {
         public VoussoirCreate()
             : base("Springer - Wall", "SprW",
-                  "Creates a massive Springer with a flat top",
+                  "Creates a massive Springer with a flat top \n(Wall Springer is only compatible with Barrel Vaults)",
                   "Voussoir", "Springer") 
         { }
 
@@ -344,6 +344,11 @@ namespace VoussoirPlugin03.Components.Springers
                 List<Brep> voussoirs = voussoirsTree.Branches[voussoirsTree.Paths.IndexOf(path)].Select(x => x.Value).ToList();
                 List<Plane> transPlanes = transPlanesTree.Branches[transPlanesTree.Paths.IndexOf(path)].Select(x => x.Value).ToList();
 
+                if (voussoirs.Count < transPlanes.Count)
+                {                    
+                    AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Input error: \nWall Springer is only compatible with Barrel Vaults.");
+                    continue;                    
+                }
                 double width = 0.3;
                 if (springerWidthTree.Branches.Count == 1)
                     width = springerWidthTree[0][0].Value;

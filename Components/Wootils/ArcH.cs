@@ -44,12 +44,15 @@ namespace VoussoirPlugin03.Components.Wootils
             if (!DA.GetData(0, ref a)) return;
             if (!DA.GetData(1, ref b)) return;
             if (!DA.GetData(2, ref height)) return;
-
+            
             double dist = a.DistanceTo(b);
             if (height > dist / 2)
             {
                 height = dist / 2;
+                this.Message = $"Clamped H: \n{height:0.###}";
             }
+            else this.Message = "";
+            
 
             Point3d mid = 0.5 * (a + b) + Vector3d.ZAxis * height;
             var arc = new Arc(a, mid, b);
