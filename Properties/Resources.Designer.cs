@@ -73,6 +73,16 @@ namespace VoussoirPlugin03.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap ArchSpringers {
+            get {
+                object obj = ResourceManager.GetObject("ArchSpringers", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap BVSrf {
             get {
                 object obj = ResourceManager.GetObject("BVSrf", resourceCulture);

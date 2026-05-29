@@ -109,7 +109,7 @@ namespace VoussoirPlugin03.Components.Springers
 
                 for (int i = 0; i < springerLines.Count; i++)
                 {
-                    var l = springerLines[i];
+                    var l = springerLines[i];                   
                     List<Brep> selectedVoussoirs = new List<Brep>();                    
 
                     for (int j = 0; j < voussoirs.Count; j++)
